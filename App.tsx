@@ -10,6 +10,7 @@ import {
   Image,
   Pressable,
   RefreshControl,
+  Share,
   ScrollView,
   StyleSheet,
   Switch,
@@ -48,6 +49,7 @@ type MisskeyNote = {
 
 type TimelineNote = {
   id: string;
+  targetId: string;
   content: string;
   createdAtLabel: string;
   user: {
@@ -110,7 +112,7 @@ function AppContent() {
   const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
   const [devMode, setDevMode] = useState(false);
   const [themeMode, setThemeMode] = useState<'system' | 'light' | 'dark'>('system');
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
   const [serverHostInput, setServerHostInput] = useState(DEFAULT_HOST);
   const [oauthLoading, setOauthLoading] = useState(false);
@@ -122,6 +124,9 @@ function AppContent() {
   const [loadingTimeline, setLoadingTimeline] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [timelineError, setTimelineError] = useState<string | null>(null);
+  const [replyingNoteId, setReplyingNoteId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
   const [debug, setDebug] = useState<DebugState>({
     lastPath: '',
     lastStatus: null,
@@ -420,6 +425,64 @@ function AppContent() {
     }
   };
 
+  const handleRenote = async (note: TimelineNote) => {
+    setNotes((current) =>
+      current.map((item) =>
+        item.id === note.id
+          ? {
+              ...item,
+              renotes: item.renotes + 1,
+            }
+          : item
+      )
+    );
+
+    try {
+      await misskeyRequest('/api/notes/create', { renoteId: note.targetId }, true);
+    } catch (error) {
+      setNotes((current) =>
+        current.map((item) =>
+          item.id === note.id
+            ? {
+                ...item,
+                renotes: Math.max(0, item.renotes - 1),
+              }
+            : item
+        )
+      );
+      Alert.alert('失敗', error instanceof Error ? error.message : 'リポストに失敗しました。');
+    }
+  };
+
+  const handleShare = async (note: TimelineNote) => {
+    const noteUrl = `https://${note.user.host}/notes/${note.targetId}`;
+    try {
+      await Share.share({ message: noteUrl, url: noteUrl });
+    } catch {
+      Alert.alert('失敗', '共有を開始できませんでした。');
+    }
+  };
+
+  const handleReplySubmit = async (note: TimelineNote) => {
+    const text = replyText.trim();
+    if (!text) {
+      Alert.alert('入力エラー', '返信内容を入力してください。');
+      return;
+    }
+
+    try {
+      setSendingReply(true);
+      await misskeyRequest('/api/notes/create', { text, replyId: note.targetId }, true);
+      setReplyText('');
+      setReplyingNoteId(null);
+      loadTimeline(true);
+    } catch (error) {
+      Alert.alert('失敗', error instanceof Error ? error.message : '返信に失敗しました。');
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
   const removeAccount = (accountId: string) => {
     setAccounts((current) => current.filter((account) => account.id !== accountId));
     setActiveAccountId((currentActive) => {
@@ -504,20 +567,17 @@ function AppContent() {
       <StatusBar style="dark" />
 
       <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
-        <View style={styles.headerLeft}>
+        <Pressable
+          style={({ pressed }) => [styles.headerAccountButton, pressed && styles.buttonPressed]}
+          onPress={() => setAccountMenuOpen((current) => !current)}
+        >
           <Image source={{ uri: activeAccount.avatarUrl }} style={styles.headerAvatar} />
           <View>
             <Text style={[styles.headerAppName, { color: colors.primaryText }]}>Crispy</Text>
             <Text style={[styles.headerName, { color: colors.text }]}>{activeAccount.displayName}</Text>
             <Text style={[styles.headerMeta, { color: colors.textMuted }]}>@{activeAccount.username} · {activeAccount.host}</Text>
           </View>
-        </View>
-
-        <Pressable
-          style={({ pressed }) => [styles.settingsButton, pressed && styles.buttonPressed]}
-          onPress={() => setSettingsOpen((current) => !current)}
-        >
-          <Ionicons name="settings-outline" size={20} color={colors.text} />
+          <Ionicons name={accountMenuOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
         </Pressable>
       </View>
 
@@ -527,43 +587,66 @@ function AppContent() {
         <TabButton label="Global" active={activeTab === 'global'} onPress={() => setActiveTab('global')} colors={colors} />
       </View>
 
-      {settingsOpen ? (
-        <View style={[styles.settingsPanel, { backgroundColor: colors.settingsBg, borderColor: colors.border }]}>
-          <Text style={[styles.settingsTitle, { color: colors.text }]}>設定</Text>
+      {accountMenuOpen ? (
+        <>
+          <Pressable style={styles.accountMenuBackdrop} onPress={() => setAccountMenuOpen(false)} />
+          <View style={[styles.accountMenuPanel, { backgroundColor: colors.settingsBg, borderColor: colors.border }]}>
+            <Text style={[styles.settingsTitle, { color: colors.text }]}>アカウント</Text>
 
-          <View style={styles.devModeRow}>
-            <Text style={[styles.devModeLabel, { color: colors.text }]}>テーマ設定: {themeMode}</Text>
-            <Pressable onPress={() => setThemeMode(m => m === 'system' ? 'light' : m === 'light' ? 'dark' : 'system')} style={{ padding: 8, backgroundColor: colors.border, borderRadius: 8 }}><Text style={{color: colors.text}}>{themeMode}</Text></Pressable>
-          </View>
-
-          <View style={styles.devModeRow}>
-            <Text style={[styles.devModeLabel, { color: colors.text }]}>devモード</Text>
-            <Switch value={devMode} onValueChange={setDevMode} />
-          </View>
-
-          <Text style={[styles.accountSectionTitle, { color: colors.textMuted }]}>アカウント切り替え</Text>
-          {accounts.map((account) => (
-            <View key={account.id} style={styles.accountRow}>
-              <Pressable style={styles.accountMain} onPress={() => setActiveAccountId(account.id)}>
-                <Image source={{ uri: account.avatarUrl }} style={styles.accountAvatar} />
-                <View>
-                  <Text style={[styles.accountName, { color: colors.text }]}>{account.displayName}</Text>
-                  <Text style={[styles.accountHost, { color: colors.textMuted }]}>@{account.username} · {account.host}</Text>
-                </View>
-              </Pressable>
-              <Pressable onPress={() => removeAccount(account.id)} style={styles.removeAccountButton}>
-                <Ionicons name="trash-outline" size={16} color="#ef4444" />
+            <View style={styles.devModeRow}>
+              <Text style={[styles.devModeLabel, { color: colors.text }]}>テーマ設定: {themeMode}</Text>
+              <Pressable
+                onPress={() =>
+                  setThemeMode((m) => (m === 'system' ? 'light' : m === 'light' ? 'dark' : 'system'))
+                }
+                style={{ padding: 8, backgroundColor: colors.border, borderRadius: 8 }}
+              >
+                <Text style={{ color: colors.text }}>{themeMode}</Text>
               </Pressable>
             </View>
-          ))}
 
-          <Pressable style={[styles.secondaryButton, { backgroundColor: colors.reactionBg }]} onPress={logoutCurrent}>
-            <Text style={[styles.secondaryButtonText, { color: colors.primaryText }]}>現在アカウントを削除</Text>
-          </Pressable>
-          <Pressable style={[styles.secondaryButton, { backgroundColor: colors.reactionBg }]} onPress={() => { setServerHostInput(DEFAULT_HOST); setActiveAccountId(null); }}>
-            <Text style={[styles.secondaryButtonText, { color: colors.primaryText }]}>別アカウントを追加</Text>
-          </Pressable>
-        </View>
+            <View style={styles.devModeRow}>
+              <Text style={[styles.devModeLabel, { color: colors.text }]}>devモード</Text>
+              <Switch value={devMode} onValueChange={setDevMode} />
+            </View>
+
+            <Text style={[styles.accountSectionTitle, { color: colors.textMuted }]}>アカウント切り替え</Text>
+            {accounts.map((account) => (
+              <View key={account.id} style={styles.accountRow}>
+                <Pressable
+                  style={styles.accountMain}
+                  onPress={() => {
+                    setActiveAccountId(account.id);
+                    setAccountMenuOpen(false);
+                  }}
+                >
+                  <Image source={{ uri: account.avatarUrl }} style={styles.accountAvatar} />
+                  <View>
+                    <Text style={[styles.accountName, { color: colors.text }]}>{account.displayName}</Text>
+                    <Text style={[styles.accountHost, { color: colors.textMuted }]}>@{account.username} · {account.host}</Text>
+                  </View>
+                </Pressable>
+                <Pressable onPress={() => removeAccount(account.id)} style={styles.removeAccountButton}>
+                  <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                </Pressable>
+              </View>
+            ))}
+
+            <Pressable style={[styles.secondaryButton, { backgroundColor: colors.reactionBg }]} onPress={logoutCurrent}>
+              <Text style={[styles.secondaryButtonText, { color: colors.primaryText }]}>現在アカウントを削除</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.secondaryButton, { backgroundColor: colors.reactionBg }]}
+              onPress={() => {
+                setServerHostInput(DEFAULT_HOST);
+                setActiveAccountId(null);
+                setAccountMenuOpen(false);
+              }}
+            >
+              <Text style={[styles.secondaryButtonText, { color: colors.primaryText }]}>別アカウントを追加</Text>
+            </Pressable>
+          </View>
+        </>
       ) : null}
 
       {loadingTimeline ? (
@@ -609,6 +692,67 @@ function AppContent() {
                     <Text style={[styles.noteCount, { color: colors.textMuted }]}>💬 {note.replies}</Text>
                     <Text style={[styles.noteCount, { color: colors.textMuted }]}>🔁 {note.renotes}</Text>
                   </View>
+
+                  <View style={styles.primaryActionsRow}>
+                    <Pressable
+                      style={({ pressed }) => [styles.actionButton, { borderColor: colors.border }, pressed && styles.buttonPressed]}
+                      onPress={() => {
+                        if (replyingNoteId === note.id) {
+                          setReplyingNoteId(null);
+                          setReplyText('');
+                          return;
+                        }
+                        setReplyingNoteId(note.id);
+                        setReplyText(`@${note.user.username} `);
+                      }}
+                    >
+                      <Ionicons name="chatbubble-outline" size={14} color={colors.textMuted} />
+                      <Text style={[styles.actionText, { color: colors.textMuted }]}>返信</Text>
+                    </Pressable>
+                    <Pressable
+                      style={({ pressed }) => [styles.actionButton, { borderColor: colors.border }, pressed && styles.buttonPressed]}
+                      onPress={() => handleRenote(note)}
+                    >
+                      <Ionicons name="repeat-outline" size={14} color={colors.textMuted} />
+                      <Text style={[styles.actionText, { color: colors.textMuted }]}>リポスト</Text>
+                    </Pressable>
+                    <Pressable
+                      style={({ pressed }) => [styles.actionButton, { borderColor: colors.border }, pressed && styles.buttonPressed]}
+                      onPress={() => handleShare(note)}
+                    >
+                      <Ionicons name="share-social-outline" size={14} color={colors.textMuted} />
+                      <Text style={[styles.actionText, { color: colors.textMuted }]}>Share</Text>
+                    </Pressable>
+                  </View>
+
+                  {replyingNoteId === note.id ? (
+                    <View style={[styles.replyComposer, { borderColor: colors.border, backgroundColor: colors.bg }]}>
+                      <TextInput
+                        value={replyText}
+                        onChangeText={setReplyText}
+                        style={[styles.replyInput, { color: colors.text }]}
+                        multiline
+                        placeholder="返信を入力"
+                        placeholderTextColor={colors.textMuted}
+                      />
+                      <Pressable
+                        style={({ pressed }) => [
+                          styles.replySendButton,
+                          { backgroundColor: colors.primary },
+                          (sendingReply || !replyText.trim()) && styles.replySendButtonDisabled,
+                          pressed && styles.buttonPressed,
+                        ]}
+                        onPress={() => handleReplySubmit(note)}
+                        disabled={sendingReply || !replyText.trim()}
+                      >
+                        {sendingReply ? (
+                          <ActivityIndicator size="small" color="#ffffff" />
+                        ) : (
+                          <Text style={styles.replySendText}>送信</Text>
+                        )}
+                      </Pressable>
+                    </View>
+                  ) : null}
 
                   <View style={styles.reactionWrap}>
                     {note.reactions.slice(0, 6).map((reaction, index) => (
@@ -671,70 +815,97 @@ function TabButton({
 
 
 function MfmRenderer({ nodes, colors }: { nodes: mfm.MfmNode[]; colors: any }) {
-  return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>
-      {nodes.map((node, i) => {
-        if (node.type === 'text') {
-          return <Text key={i} style={{ color: colors.text }}>{node.props.text}</Text>;
-        }
-        if (node.type === 'unicodeEmoji') {
-          return <Text key={i}>{node.props.emoji}</Text>;
-        }
-        if (node.type === 'emojiCode') {
-          return <Text key={i} style={{ color: colors.text }}>:{node.props.name}:</Text>;
-        }
-        if (node.type === 'url' || node.type === 'link') {
-          return (
-            <Text
-              key={i}
-              style={{ color: colors.primaryText, textDecorationLine: 'underline' }}
-              onPress={() => Linking.openURL(node.props.url)}
-            >
-              {node.type === 'link' ? <MfmRenderer nodes={node.children} colors={colors} /> : node.props.url}
-            </Text>
-          );
-        }
-        if (node.type === 'mention') {
-          return <Text key={i} style={{ color: colors.primaryText }}>{node.props.acct}</Text>;
-        }
-        if (node.type === 'hashtag') {
-          return <Text key={i} style={{ color: colors.primaryText }}>#{node.props.hashtag}</Text>;
-        }
-        if (node.type === 'bold') {
-          return (
-            <Text key={i} style={{ fontWeight: 'bold', color: colors.text }}>
-              <MfmRenderer nodes={node.children} colors={colors} />
-            </Text>
-          );
-        }
-        if (node.type === 'italic') {
-          return (
-            <Text key={i} style={{ fontStyle: 'italic', color: colors.text }}>
-              <MfmRenderer nodes={node.children} colors={colors} />
-            </Text>
-          );
-        }
-        if (node.type === 'strike') {
-          return (
-            <Text key={i} style={{ textDecorationLine: 'line-through', color: colors.text }}>
-              <MfmRenderer nodes={node.children} colors={colors} />
-            </Text>
-          );
-        }
-        if (node.type === 'quote') {
-          return (
-            <View key={i} style={{ borderLeftWidth: 3, borderLeftColor: colors.border, paddingLeft: 8, marginVertical: 4 }}>
-              <MfmRenderer nodes={node.children} colors={colors} />
-            </View>
-          );
-        }
-        if ('children' in node && Array.isArray(node.children)) {
-          return <MfmRenderer key={i} nodes={node.children} colors={colors} />;
-        }
-        return null;
-      })}
-    </View>
-  );
+  const renderNodes = (targetNodes: mfm.MfmNode[], keyPrefix: string) =>
+    targetNodes.map((node, i) => {
+      const key = `${keyPrefix}-${i}`;
+      if (node.type === 'text') {
+        return (
+          <Text key={key} style={{ color: colors.text }}>
+            {node.props.text}
+          </Text>
+        );
+      }
+      if (node.type === 'unicodeEmoji') {
+        return <Text key={key}>{node.props.emoji}</Text>;
+      }
+      if (node.type === 'emojiCode') {
+        return (
+          <Text key={key} style={{ color: colors.text }}>
+            :{node.props.name}:
+          </Text>
+        );
+      }
+      if (node.type === 'url') {
+        return (
+          <Text key={key} style={{ color: colors.primaryText, textDecorationLine: 'underline' }} onPress={() => Linking.openURL(node.props.url)}>
+            {node.props.url}
+          </Text>
+        );
+      }
+      if (node.type === 'link') {
+        return (
+          <Text key={key} style={{ color: colors.primaryText, textDecorationLine: 'underline' }} onPress={() => Linking.openURL(node.props.url)}>
+            {renderNodes(node.children, key)}
+          </Text>
+        );
+      }
+      if (node.type === 'mention') {
+        return (
+          <Text key={key} style={{ color: colors.primaryText }}>
+            {node.props.acct}
+          </Text>
+        );
+      }
+      if (node.type === 'hashtag') {
+        return (
+          <Text key={key} style={{ color: colors.primaryText }}>
+            #{node.props.hashtag}
+          </Text>
+        );
+      }
+      if (node.type === 'bold') {
+        return (
+          <Text key={key} style={{ fontWeight: 'bold', color: colors.text }}>
+            {renderNodes(node.children, key)}
+          </Text>
+        );
+      }
+      if (node.type === 'italic') {
+        return (
+          <Text key={key} style={{ fontStyle: 'italic', color: colors.text }}>
+            {renderNodes(node.children, key)}
+          </Text>
+        );
+      }
+      if (node.type === 'strike') {
+        return (
+          <Text key={key} style={{ textDecorationLine: 'line-through', color: colors.text }}>
+            {renderNodes(node.children, key)}
+          </Text>
+        );
+      }
+      if (node.type === 'quote') {
+        return (
+          <Text key={key} style={{ color: colors.textMuted }}>
+            {'\n'}
+            {'「'}
+            {renderNodes(node.children, key)}
+            {'」'}
+            {'\n'}
+          </Text>
+        );
+      }
+      if ('children' in node && Array.isArray(node.children)) {
+        return (
+          <Text key={key} style={{ color: colors.text }}>
+            {renderNodes(node.children, key)}
+          </Text>
+        );
+      }
+      return null;
+    });
+
+  return <Text style={[styles.noteContent, { color: colors.text }]}>{renderNodes(nodes, 'node')}</Text>;
 }
 
 function normalizeHost(input: string): string {
@@ -763,6 +934,7 @@ function mapNote(note: MisskeyNote, fallbackHost: string): TimelineNote {
 
   return {
     id: note.id,
+    targetId: target.id,
     content: content || '(no text)',
     createdAtLabel: toRelativeTime(target.createdAt),
     user: {
@@ -943,6 +1115,12 @@ const styles = StyleSheet.create({
     gap: 12,
     flex: 1,
   },
+  headerAccountButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
   headerAvatar: {
     width: 44,
     height: 44,
@@ -965,14 +1143,6 @@ const styles = StyleSheet.create({
   headerMeta: {
     color: '#64748b',
     fontSize: 12,
-  },
-  settingsButton: {
-    width: 38,
-    height: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 19,
-    backgroundColor: '#eff6ff',
   },
   tabBar: {
     flexDirection: 'row',
@@ -999,15 +1169,24 @@ const styles = StyleSheet.create({
   tabButtonTextActive: {
     color: '#1e40af',
   },
-  settingsPanel: {
+  accountMenuPanel: {
     borderWidth: 1,
     borderColor: '#dbeafe',
     backgroundColor: '#f8fbff',
     marginHorizontal: 12,
-    marginTop: 8,
+    marginTop: 2,
     borderRadius: 14,
     padding: 12,
     gap: 10,
+    position: 'absolute',
+    right: 12,
+    top: 66,
+    width: '84%',
+    zIndex: 50,
+  },
+  accountMenuBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 40,
   },
   settingsTitle: {
     fontWeight: '900',
@@ -1124,6 +1303,7 @@ const styles = StyleSheet.create({
   noteRow: {
     flexDirection: 'row',
     gap: 10,
+    alignItems: 'flex-start',
   },
   noteAvatar: {
     width: 36,
@@ -1133,6 +1313,7 @@ const styles = StyleSheet.create({
   noteMain: {
     flex: 1,
     gap: 6,
+    minWidth: 0,
   },
   noteHeaderRow: {
     flexDirection: 'row',
@@ -1157,6 +1338,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 16,
   },
+  primaryActionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  actionText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
   noteCount: {
     color: '#64748b',
     fontSize: 12,
@@ -1165,6 +1364,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
+  },
+  replyComposer: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 8,
+    gap: 8,
+  },
+  replyInput: {
+    minHeight: 48,
+    textAlignVertical: 'top',
+    fontSize: 14,
+  },
+  replySendButton: {
+    alignSelf: 'flex-end',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  replySendButtonDisabled: {
+    opacity: 0.6,
+  },
+  replySendText: {
+    color: '#ffffff',
+    fontWeight: '800',
+    fontSize: 12,
   },
   reactionButton: {
     flexDirection: 'row',
