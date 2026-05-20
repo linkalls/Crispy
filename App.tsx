@@ -113,6 +113,7 @@ function AppContent() {
   const [devMode, setDevMode] = useState(false);
   const [themeMode, setThemeMode] = useState<'system' | 'light' | 'dark'>('system');
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [addingAccount, setAddingAccount] = useState(false);
 
   const [serverHostInput, setServerHostInput] = useState(DEFAULT_HOST);
   const [oauthLoading, setOauthLoading] = useState(false);
@@ -263,6 +264,7 @@ function AppContent() {
   }, [activeAccount, activeTab, loadTimeline]);
 
   const finishMiAuthLogin = useCallback(async (session: string, host: string) => {
+    const hadActiveAccount = Boolean(activeAccountId);
     try {
       setOauthLoading(true);
       const checkResponse = await fetch(`https://${host}/api/miauth/${session}/check`, {
@@ -298,16 +300,20 @@ function AppContent() {
       });
       setActiveAccountId(newAccount.id);
       setServerHostInput(host);
-      setActiveTab('home');
+      if (!hadActiveAccount) {
+        setActiveTab('home');
+      }
       setActiveAuthSession(null);
       setOauthError(null);
+      setAddingAccount(false);
+      setAccountMenuOpen(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'ログインに失敗しました。';
       setOauthError(message);
     } finally {
       setOauthLoading(false);
     }
-  }, []);
+  }, [activeAccountId]);
 
   useEffect(() => {
     const handleUrl = (event: Linking.EventType) => {
@@ -569,7 +575,15 @@ function AppContent() {
       <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
         <Pressable
           style={({ pressed }) => [styles.headerAccountButton, pressed && styles.buttonPressed]}
-          onPress={() => setAccountMenuOpen((current) => !current)}
+          onPress={() =>
+            setAccountMenuOpen((current) => {
+              if (current) {
+                setAddingAccount(false);
+                setOauthError(null);
+              }
+              return !current;
+            })
+          }
         >
           <Image source={{ uri: activeAccount.avatarUrl }} style={styles.headerAvatar} />
           <View>
@@ -589,7 +603,14 @@ function AppContent() {
 
       {accountMenuOpen ? (
         <>
-          <Pressable style={styles.accountMenuBackdrop} onPress={() => setAccountMenuOpen(false)} />
+          <Pressable
+            style={styles.accountMenuBackdrop}
+            onPress={() => {
+              setAccountMenuOpen(false);
+              setAddingAccount(false);
+              setOauthError(null);
+            }}
+          />
           <View style={[styles.accountMenuPanel, { backgroundColor: colors.settingsBg, borderColor: colors.border }]}>
             <Text style={[styles.settingsTitle, { color: colors.text }]}>アカウント</Text>
 
@@ -618,6 +639,8 @@ function AppContent() {
                   onPress={() => {
                     setActiveAccountId(account.id);
                     setAccountMenuOpen(false);
+                    setAddingAccount(false);
+                    setOauthError(null);
                   }}
                 >
                   <Image source={{ uri: account.avatarUrl }} style={styles.accountAvatar} />
@@ -638,13 +661,54 @@ function AppContent() {
             <Pressable
               style={[styles.secondaryButton, { backgroundColor: colors.reactionBg }]}
               onPress={() => {
-                setServerHostInput(DEFAULT_HOST);
-                setActiveAccountId(null);
-                setAccountMenuOpen(false);
+                setServerHostInput(activeAccount.host);
+                setOauthError(null);
+                setAddingAccount(true);
               }}
             >
               <Text style={[styles.secondaryButtonText, { color: colors.primaryText }]}>別アカウントを追加</Text>
             </Pressable>
+
+            {addingAccount ? (
+              <View style={[styles.addAccountCard, { borderColor: colors.border, backgroundColor: colors.cardBg }]}>
+                <Text style={[styles.addAccountTitle, { color: colors.text }]}>別アカウントを追加</Text>
+                <TextInput
+                  value={serverHostInput}
+                  onChangeText={setServerHostInput}
+                  style={[styles.addAccountInput, { borderColor: colors.border, color: colors.text, backgroundColor: colors.bg }]}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  placeholder="misskey.io"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="url"
+                  returnKeyType="go"
+                  onSubmitEditing={startMiAuthLogin}
+                />
+                <View style={styles.addAccountActions}>
+                  <Pressable
+                    style={({ pressed }) => [styles.addAccountActionButton, { borderColor: colors.border }, pressed && styles.buttonPressed]}
+                    onPress={() => {
+                      setAddingAccount(false);
+                      setOauthError(null);
+                    }}
+                  >
+                    <Text style={[styles.addAccountCancelText, { color: colors.textMuted }]}>キャンセル</Text>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.addAccountActionButton,
+                      { backgroundColor: colors.primary, borderColor: colors.primary },
+                      pressed && styles.buttonPressed,
+                    ]}
+                    onPress={startMiAuthLogin}
+                    disabled={oauthLoading}
+                  >
+                    {oauthLoading ? <ActivityIndicator size="small" color="#ffffff" /> : <Text style={styles.addAccountLoginText}>ログイン</Text>}
+                  </Pressable>
+                </View>
+                {oauthError ? <Text style={styles.oauthErrorText}>{oauthError}</Text> : null}
+              </View>
+            ) : null}
           </View>
         </>
       ) : null}
@@ -1247,6 +1311,41 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: '#1e3a8a',
     fontWeight: '700',
+  },
+  addAccountCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 10,
+    gap: 8,
+  },
+  addAccountTitle: {
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  addAccountInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+  },
+  addAccountActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  addAccountActionButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 38,
+  },
+  addAccountCancelText: {
+    fontWeight: '700',
+  },
+  addAccountLoginText: {
+    color: '#ffffff',
+    fontWeight: '800',
   },
   timelineLoading: {
     flex: 1,
