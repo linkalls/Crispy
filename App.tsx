@@ -10,14 +10,16 @@ import {
   Image,
   Pressable,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
   TextInput,
   View,
+  useColorScheme,
 } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import * as mfm from 'mfm-js';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -74,6 +76,7 @@ type PersistedState = {
   accounts: StoredAccount[];
   activeAccountId: string | null;
   devMode: boolean;
+  themeMode?: 'system' | 'light' | 'dark';
 };
 
 type MisskeyMiAuthCheck = {
@@ -94,14 +97,24 @@ const DEFAULT_AVATAR =
   'https://api.dicebear.com/9.x/avataaars/svg?seed=Crispy&backgroundColor=b6e3f4';
 
 export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppContent />
+    </SafeAreaProvider>
+  );
+}
+
+function AppContent() {
   const [hydrated, setHydrated] = useState(false);
   const [accounts, setAccounts] = useState<StoredAccount[]>([]);
   const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
   const [devMode, setDevMode] = useState(false);
+  const [themeMode, setThemeMode] = useState<'system' | 'light' | 'dark'>('system');
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [serverHostInput, setServerHostInput] = useState(DEFAULT_HOST);
   const [oauthLoading, setOauthLoading] = useState(false);
+  const [activeAuthSession, setActiveAuthSession] = useState<{ session: string; host: string } | null>(null);
   const [oauthError, setOauthError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<TimelineTab>('home');
@@ -124,6 +137,7 @@ export default function App() {
         if (Array.isArray(parsed.accounts)) setAccounts(parsed.accounts);
         setActiveAccountId(parsed.activeAccountId ?? null);
         setDevMode(Boolean(parsed.devMode));
+        if (parsed.themeMode) setThemeMode(parsed.themeMode);
       } catch {
         // noop
       } finally {
@@ -140,9 +154,14 @@ export default function App() {
       accounts,
       activeAccountId,
       devMode,
+      themeMode,
     };
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => undefined);
-  }, [accounts, activeAccountId, devMode, hydrated]);
+  }, [accounts, activeAccountId, devMode, themeMode, hydrated]);
+
+  const colorScheme = useColorScheme();
+  const isDark = themeMode === 'system' ? colorScheme === 'dark' : themeMode === 'dark';
+  const colors = isDark ? darkColors : lightColors;
 
   const activeAccount = useMemo(
     () => accounts.find((account) => account.id === activeAccountId) ?? null,
@@ -178,7 +197,12 @@ export default function App() {
         throw new Error(`Misskey API error: ${response.status}`);
       }
 
-      return (await response.json()) as T;
+      if (response.status === 204) {
+        return {} as T;
+      }
+
+      const text = await response.text();
+      return (text ? JSON.parse(text) : {}) as T;
     },
     [activeAccount]
   );
@@ -233,45 +257,9 @@ export default function App() {
     loadTimeline(false);
   }, [activeAccount, activeTab, loadTimeline]);
 
-  const startMiAuthLogin = async () => {
-    const host = normalizeHost(serverHostInput);
-    if (!host) {
-      setOauthError('サーバーのホスト名を入力してください。');
-      return;
-    }
-
-    setOauthLoading(true);
-    setOauthError(null);
-
-    const session = createSessionId();
-    const callbackUrl = Linking.createURL('auth/callback', { scheme: 'crispy' });
-    const permission = [
-      'read:account',
-      'read:notes',
-      'write:notes',
-      'write:reactions',
-      'write:notifications',
-    ].join(',');
-
-    const authUrl = `https://${host}/miauth/${session}?name=${encodeURIComponent(
-      'Crispy'
-    )}&callback=${encodeURIComponent(callbackUrl)}&permission=${encodeURIComponent(permission)}`;
-
+  const finishMiAuthLogin = useCallback(async (session: string, host: string) => {
     try {
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, callbackUrl);
-
-      if (result.type !== 'success') {
-        throw new Error('ログインがキャンセルされました。');
-      }
-
-      const parsed = Linking.parse(result.url);
-      const callbackSession =
-        typeof parsed.queryParams?.session === 'string' ? parsed.queryParams.session : undefined;
-
-      if (callbackSession && callbackSession !== session) {
-        throw new Error('OAuth セッション検証に失敗しました。');
-      }
-
+      setOauthLoading(true);
       const checkResponse = await fetch(`https://${host}/api/miauth/${session}/check`, {
         method: 'POST',
         headers: {
@@ -306,11 +294,77 @@ export default function App() {
       setActiveAccountId(newAccount.id);
       setServerHostInput(host);
       setActiveTab('home');
+      setActiveAuthSession(null);
+      setOauthError(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'ログインに失敗しました。';
       setOauthError(message);
     } finally {
       setOauthLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleUrl = (event: Linking.EventType) => {
+      if (!activeAuthSession) return;
+      const parsed = Linking.parse(event.url);
+      const callbackSession =
+        typeof parsed.queryParams?.session === 'string' ? parsed.queryParams.session : undefined;
+
+      if (callbackSession && callbackSession === activeAuthSession.session) {
+        finishMiAuthLogin(activeAuthSession.session, activeAuthSession.host);
+      } else if (parsed.hostname === 'auth' && parsed.path === 'callback') {
+        setOauthError('OAuth セッション検証に失敗しました。');
+        setActiveAuthSession(null);
+        setOauthLoading(false);
+      }
+    };
+
+    const subscription = Linking.addEventListener('url', handleUrl);
+
+    Linking.getInitialURL().then((url) => {
+      if (url && activeAuthSession) {
+        handleUrl({ url });
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [activeAuthSession, finishMiAuthLogin]);
+
+  const startMiAuthLogin = async () => {
+    const host = normalizeHost(serverHostInput);
+    if (!host) {
+      setOauthError('サーバーのホスト名を入力してください。');
+      return;
+    }
+
+    setOauthLoading(true);
+    setOauthError(null);
+
+    const session = createSessionId();
+    setActiveAuthSession({ session, host });
+
+    const callbackUrl = Linking.createURL('auth/callback', { scheme: 'crispy' });
+    const permission = [
+      'read:account',
+      'read:notes',
+      'write:notes',
+      'write:reactions',
+      'write:notifications',
+    ].join(',');
+
+    const authUrl = `https://${host}/miauth/${session}?name=${encodeURIComponent(
+      'Crispy'
+    )}&callback=${encodeURIComponent(callbackUrl)}&permission=${encodeURIComponent(permission)}`;
+
+    try {
+      await Linking.openURL(authUrl);
+    } catch (error) {
+      setOauthError('ブラウザを開けませんでした。');
+      setOauthLoading(false);
+      setActiveAuthSession(null);
     }
   };
 
@@ -399,7 +453,7 @@ export default function App() {
   if (!activeAccount) {
     return (
       <SafeAreaView style={styles.onboardingScreen}>
-        <StatusBar style="dark" />
+        <StatusBar style={isDark ? "light" : "dark"} />
         <View style={styles.onboardingCard}>
           <View style={styles.onboardingBrand}>
             <View style={styles.onboardingBrandIcon}>
@@ -446,16 +500,16 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]}>
       <StatusBar style="dark" />
 
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
         <View style={styles.headerLeft}>
           <Image source={{ uri: activeAccount.avatarUrl }} style={styles.headerAvatar} />
           <View>
-            <Text style={styles.headerAppName}>Crispy</Text>
-            <Text style={styles.headerName}>{activeAccount.displayName}</Text>
-            <Text style={styles.headerMeta}>@{activeAccount.username} · {activeAccount.host}</Text>
+            <Text style={[styles.headerAppName, { color: colors.primaryText }]}>Crispy</Text>
+            <Text style={[styles.headerName, { color: colors.text }]}>{activeAccount.displayName}</Text>
+            <Text style={[styles.headerMeta, { color: colors.textMuted }]}>@{activeAccount.username} · {activeAccount.host}</Text>
           </View>
         </View>
 
@@ -463,33 +517,38 @@ export default function App() {
           style={({ pressed }) => [styles.settingsButton, pressed && styles.buttonPressed]}
           onPress={() => setSettingsOpen((current) => !current)}
         >
-          <Ionicons name="settings-outline" size={20} color="#334155" />
+          <Ionicons name="settings-outline" size={20} color={colors.text} />
         </Pressable>
       </View>
 
-      <View style={styles.tabBar}>
-        <TabButton label="For You" active={activeTab === 'home'} onPress={() => setActiveTab('home')} />
-        <TabButton label="Local" active={activeTab === 'local'} onPress={() => setActiveTab('local')} />
-        <TabButton label="Global" active={activeTab === 'global'} onPress={() => setActiveTab('global')} />
+      <View style={[styles.tabBar, { backgroundColor: colors.tabBg }]}>
+        <TabButton label="For You" active={activeTab === 'home'} onPress={() => setActiveTab('home')} colors={colors} />
+        <TabButton label="Local" active={activeTab === 'local'} onPress={() => setActiveTab('local')} colors={colors} />
+        <TabButton label="Global" active={activeTab === 'global'} onPress={() => setActiveTab('global')} colors={colors} />
       </View>
 
       {settingsOpen ? (
-        <View style={styles.settingsPanel}>
-          <Text style={styles.settingsTitle}>設定</Text>
+        <View style={[styles.settingsPanel, { backgroundColor: colors.settingsBg, borderColor: colors.border }]}>
+          <Text style={[styles.settingsTitle, { color: colors.text }]}>設定</Text>
 
           <View style={styles.devModeRow}>
-            <Text style={styles.devModeLabel}>devモード</Text>
+            <Text style={[styles.devModeLabel, { color: colors.text }]}>テーマ設定: {themeMode}</Text>
+            <Pressable onPress={() => setThemeMode(m => m === 'system' ? 'light' : m === 'light' ? 'dark' : 'system')} style={{ padding: 8, backgroundColor: colors.border, borderRadius: 8 }}><Text style={{color: colors.text}}>{themeMode}</Text></Pressable>
+          </View>
+
+          <View style={styles.devModeRow}>
+            <Text style={[styles.devModeLabel, { color: colors.text }]}>devモード</Text>
             <Switch value={devMode} onValueChange={setDevMode} />
           </View>
 
-          <Text style={styles.accountSectionTitle}>アカウント切り替え</Text>
+          <Text style={[styles.accountSectionTitle, { color: colors.textMuted }]}>アカウント切り替え</Text>
           {accounts.map((account) => (
             <View key={account.id} style={styles.accountRow}>
               <Pressable style={styles.accountMain} onPress={() => setActiveAccountId(account.id)}>
                 <Image source={{ uri: account.avatarUrl }} style={styles.accountAvatar} />
                 <View>
-                  <Text style={styles.accountName}>{account.displayName}</Text>
-                  <Text style={styles.accountHost}>@{account.username} · {account.host}</Text>
+                  <Text style={[styles.accountName, { color: colors.text }]}>{account.displayName}</Text>
+                  <Text style={[styles.accountHost, { color: colors.textMuted }]}>@{account.username} · {account.host}</Text>
                 </View>
               </Pressable>
               <Pressable onPress={() => removeAccount(account.id)} style={styles.removeAccountButton}>
@@ -498,11 +557,11 @@ export default function App() {
             </View>
           ))}
 
-          <Pressable style={styles.secondaryButton} onPress={logoutCurrent}>
-            <Text style={styles.secondaryButtonText}>現在アカウントを削除</Text>
+          <Pressable style={[styles.secondaryButton, { backgroundColor: colors.reactionBg }]} onPress={logoutCurrent}>
+            <Text style={[styles.secondaryButtonText, { color: colors.primaryText }]}>現在アカウントを削除</Text>
           </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={startMiAuthLogin}>
-            <Text style={styles.secondaryButtonText}>別アカウントを追加</Text>
+          <Pressable style={[styles.secondaryButton, { backgroundColor: colors.reactionBg }]} onPress={() => { setServerHostInput(DEFAULT_HOST); setActiveAccountId(null); }}>
+            <Text style={[styles.secondaryButtonText, { color: colors.primaryText }]}>別アカウントを追加</Text>
           </Pressable>
         </View>
       ) : null}
@@ -510,7 +569,7 @@ export default function App() {
       {loadingTimeline ? (
         <View style={styles.timelineLoading}>
           <ActivityIndicator size="large" color="#1d9bf0" />
-          <Text style={styles.timelineLoadingText}>タイムラインを読み込み中...</Text>
+          <Text style={[styles.timelineLoadingText, { color: colors.textMuted }]}>タイムラインを読み込み中...</Text>
         </View>
       ) : (
         <ScrollView
@@ -520,35 +579,35 @@ export default function App() {
         >
           {timelineError ? <Text style={styles.timelineError}>{timelineError}</Text> : null}
           {!timelineError && notes.length === 0 ? (
-            <View style={styles.emptyStateCard}>
-              <Text style={styles.emptyStateTitle}>表示できるノートがありません</Text>
-              <Text style={styles.emptyStateText}>少し待ってから再読み込みしてください。</Text>
+            <View style={[styles.emptyStateCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+              <Text style={[styles.emptyStateTitle, { color: colors.text }]}>表示できるノートがありません</Text>
+              <Text style={[styles.emptyStateText, { color: colors.textMuted }]}>少し待ってから再読み込みしてください。</Text>
               <Pressable
-                style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+                style={({ pressed }) => [styles.secondaryButton, { backgroundColor: colors.reactionBg }, pressed && styles.buttonPressed]}
                 onPress={() => loadTimeline(true)}
               >
-                <Text style={styles.secondaryButtonText}>再読み込み</Text>
+                <Text style={[styles.secondaryButtonText, { color: colors.primaryText }]}>再読み込み</Text>
               </Pressable>
             </View>
           ) : null}
 
           {notes.map((note) => (
-            <View key={note.id} style={styles.noteCard}>
-              {note.renoteUser ? <Text style={styles.renoteText}>{note.renoteUser} がリノート</Text> : null}
+            <View key={note.id} style={[styles.noteCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+              {note.renoteUser ? <Text style={[styles.renoteText, { color: colors.textMuted }]}>{note.renoteUser} がリノート</Text> : null}
               <View style={styles.noteRow}>
                 <Image source={{ uri: note.user.avatar }} style={styles.noteAvatar} />
                 <View style={styles.noteMain}>
                   <View style={styles.noteHeaderRow}>
-                    <Text style={styles.noteName}>{note.user.name}</Text>
-                    <Text style={styles.noteMeta}>
+                    <Text style={[styles.noteName, { color: colors.text }]}>{note.user.name}</Text>
+                    <Text style={[styles.noteMeta, { color: colors.textMuted }]}>
                       @{note.user.username}@{note.user.host} · {note.createdAtLabel}
                     </Text>
                   </View>
-                  <Text style={styles.noteContent}>{note.content}</Text>
+                  <MfmRenderer nodes={mfm.parseSimple(note.content)} colors={colors} />
 
                   <View style={styles.noteActions}>
-                    <Text style={styles.noteCount}>💬 {note.replies}</Text>
-                    <Text style={styles.noteCount}>🔁 {note.renotes}</Text>
+                    <Text style={[styles.noteCount, { color: colors.textMuted }]}>💬 {note.replies}</Text>
+                    <Text style={[styles.noteCount, { color: colors.textMuted }]}>🔁 {note.renotes}</Text>
                   </View>
 
                   <View style={styles.reactionWrap}>
@@ -556,14 +615,14 @@ export default function App() {
                       <Pressable
                         key={`${note.id}-${reaction.emoji}-${index}`}
                         style={({ pressed }) => [
-                          styles.reactionButton,
-                          reaction.reacted && styles.reactionActive,
+                          styles.reactionButton, { backgroundColor: colors.reactionBg, borderColor: colors.reactionBorder },
+                          reaction.reacted && [styles.reactionActive, { backgroundColor: colors.reactionActiveBg, borderColor: colors.reactionActiveBorder }],
                           pressed && styles.buttonPressed,
                         ]}
                         onPress={() => handleReactionToggle(note.id, index)}
                       >
-                        <Text style={styles.reactionText}>{reaction.emoji}</Text>
-                        <Text style={styles.reactionCount}>{reaction.count}</Text>
+                        <Text style={[styles.reactionText, { color: colors.text }]}>{reaction.emoji}</Text>
+                        <Text style={[styles.reactionCount, { color: colors.textMuted }]}>{reaction.count}</Text>
                       </Pressable>
                     ))}
                   </View>
@@ -593,18 +652,88 @@ function TabButton({
   label,
   active,
   onPress,
+  colors,
 }: {
   label: string;
   active: boolean;
   onPress: () => void;
+  colors: any;
 }) {
   return (
     <Pressable
-      style={({ pressed }) => [styles.tabButton, active && styles.tabButtonActive, pressed && styles.buttonPressed]}
+      style={({ pressed }) => [styles.tabButton, active && styles.tabButtonActive, active && { backgroundColor: colors.tabActiveBg }, pressed && styles.buttonPressed]}
       onPress={onPress}
     >
-      <Text style={[styles.tabButtonText, active && styles.tabButtonTextActive]}>{label}</Text>
+      <Text style={[styles.tabButtonText, { color: colors.tabText }, active && styles.tabButtonTextActive, active && { color: colors.tabActiveText }]}>{label}</Text>
     </Pressable>
+  );
+}
+
+
+function MfmRenderer({ nodes, colors }: { nodes: mfm.MfmNode[]; colors: any }) {
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>
+      {nodes.map((node, i) => {
+        if (node.type === 'text') {
+          return <Text key={i} style={{ color: colors.text }}>{node.props.text}</Text>;
+        }
+        if (node.type === 'unicodeEmoji') {
+          return <Text key={i}>{node.props.emoji}</Text>;
+        }
+        if (node.type === 'emojiCode') {
+          return <Text key={i} style={{ color: colors.text }}>:{node.props.name}:</Text>;
+        }
+        if (node.type === 'url' || node.type === 'link') {
+          return (
+            <Text
+              key={i}
+              style={{ color: colors.primaryText, textDecorationLine: 'underline' }}
+              onPress={() => Linking.openURL(node.props.url)}
+            >
+              {node.type === 'link' ? <MfmRenderer nodes={node.children} colors={colors} /> : node.props.url}
+            </Text>
+          );
+        }
+        if (node.type === 'mention') {
+          return <Text key={i} style={{ color: colors.primaryText }}>{node.props.acct}</Text>;
+        }
+        if (node.type === 'hashtag') {
+          return <Text key={i} style={{ color: colors.primaryText }}>#{node.props.hashtag}</Text>;
+        }
+        if (node.type === 'bold') {
+          return (
+            <Text key={i} style={{ fontWeight: 'bold', color: colors.text }}>
+              <MfmRenderer nodes={node.children} colors={colors} />
+            </Text>
+          );
+        }
+        if (node.type === 'italic') {
+          return (
+            <Text key={i} style={{ fontStyle: 'italic', color: colors.text }}>
+              <MfmRenderer nodes={node.children} colors={colors} />
+            </Text>
+          );
+        }
+        if (node.type === 'strike') {
+          return (
+            <Text key={i} style={{ textDecorationLine: 'line-through', color: colors.text }}>
+              <MfmRenderer nodes={node.children} colors={colors} />
+            </Text>
+          );
+        }
+        if (node.type === 'quote') {
+          return (
+            <View key={i} style={{ borderLeftWidth: 3, borderLeftColor: colors.border, paddingLeft: 8, marginVertical: 4 }}>
+              <MfmRenderer nodes={node.children} colors={colors} />
+            </View>
+          );
+        }
+        if ('children' in node && Array.isArray(node.children)) {
+          return <MfmRenderer key={i} nodes={node.children} colors={colors} />;
+        }
+        return null;
+      })}
+    </View>
   );
 }
 
@@ -653,6 +782,47 @@ function mapNote(note: MisskeyNote, fallbackHost: string): TimelineNote {
     renotes: target.renoteCount ?? 0,
   };
 }
+
+
+const lightColors = {
+  bg: '#f6f8ff',
+  cardBg: '#ffffff',
+  text: '#0f172a',
+  textMuted: '#64748b',
+  border: '#dbeafe',
+  primary: '#2563eb',
+  primaryText: '#1d4ed8',
+  tabBg: '#eaf1ff',
+  tabActiveBg: '#ffffff',
+  tabText: '#475569',
+  tabActiveText: '#1e40af',
+  headerBg: '#ffffff',
+  settingsBg: '#f8fbff',
+  reactionBg: '#f8fbff',
+  reactionBorder: '#dbeafe',
+  reactionActiveBg: '#dbeafe',
+  reactionActiveBorder: '#60a5fa',
+};
+
+const darkColors = {
+  bg: '#0f172a',
+  cardBg: '#1e293b',
+  text: '#f8fafc',
+  textMuted: '#94a3b8',
+  border: '#334155',
+  primary: '#3b82f6',
+  primaryText: '#60a5fa',
+  tabBg: '#1e293b',
+  tabActiveBg: '#334155',
+  tabText: '#94a3b8',
+  tabActiveText: '#f8fafc',
+  headerBg: '#0f172a',
+  settingsBg: '#1e293b',
+  reactionBg: '#1e293b',
+  reactionBorder: '#334155',
+  reactionActiveBg: '#334155',
+  reactionActiveBorder: '#3b82f6',
+};
 
 const styles = StyleSheet.create({
   centerLoading: {
