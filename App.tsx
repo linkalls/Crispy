@@ -10,6 +10,7 @@ import {
   Image,
   Pressable,
   RefreshControl,
+  SafeAreaView,
   ScrollView,
   StyleSheet,
   Switch,
@@ -397,7 +398,7 @@ export default function App() {
 
   if (!activeAccount) {
     return (
-      <View style={styles.onboardingScreen}>
+      <SafeAreaView style={styles.onboardingScreen}>
         <StatusBar style="dark" />
         <View style={styles.onboardingCard}>
           <Text style={styles.onboardingTitle}>Crispy</Text>
@@ -412,9 +413,16 @@ export default function App() {
             autoCorrect={false}
             placeholder="misskey.io"
             placeholderTextColor="#6b7280"
+            keyboardType="url"
+            returnKeyType="go"
+            onSubmitEditing={startMiAuthLogin}
           />
 
-          <Pressable style={styles.oauthButton} onPress={startMiAuthLogin} disabled={oauthLoading}>
+          <Pressable
+            style={({ pressed }) => [styles.oauthButton, pressed && styles.buttonPressed]}
+            onPress={startMiAuthLogin}
+            disabled={oauthLoading}
+          >
             {oauthLoading ? (
               <ActivityIndicator color="#fff" />
             ) : (
@@ -427,12 +435,12 @@ export default function App() {
             初回起動時にサーバーを入力し、OAuth(MiAuth) でログインします。
           </Text>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.screen}>
+    <SafeAreaView style={styles.screen}>
       <StatusBar style="dark" />
 
       <View style={styles.header}>
@@ -444,7 +452,10 @@ export default function App() {
           </View>
         </View>
 
-        <Pressable style={styles.settingsButton} onPress={() => setSettingsOpen((current) => !current)}>
+        <Pressable
+          style={({ pressed }) => [styles.settingsButton, pressed && styles.buttonPressed]}
+          onPress={() => setSettingsOpen((current) => !current)}
+        >
           <Ionicons name="settings-outline" size={20} color="#334155" />
         </Pressable>
       </View>
@@ -501,6 +512,18 @@ export default function App() {
           showsVerticalScrollIndicator={false}
         >
           {timelineError ? <Text style={styles.timelineError}>{timelineError}</Text> : null}
+          {!timelineError && notes.length === 0 ? (
+            <View style={styles.emptyStateCard}>
+              <Text style={styles.emptyStateTitle}>表示できるノートがありません</Text>
+              <Text style={styles.emptyStateText}>少し待ってから再読み込みしてください。</Text>
+              <Pressable
+                style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+                onPress={() => loadTimeline(true)}
+              >
+                <Text style={styles.secondaryButtonText}>再読み込み</Text>
+              </Pressable>
+            </View>
+          ) : null}
 
           {notes.map((note) => (
             <View key={note.id} style={styles.noteCard}>
@@ -523,7 +546,11 @@ export default function App() {
                     {note.reactions.slice(0, 6).map((reaction, index) => (
                       <Pressable
                         key={`${note.id}-${reaction.emoji}-${index}`}
-                        style={[styles.reactionButton, reaction.reacted && styles.reactionActive]}
+                        style={({ pressed }) => [
+                          styles.reactionButton,
+                          reaction.reacted && styles.reactionActive,
+                          pressed && styles.buttonPressed,
+                        ]}
                         onPress={() => handleReactionToggle(note.id, index)}
                       >
                         <Text style={styles.reactionText}>{reaction.emoji}</Text>
@@ -549,7 +576,7 @@ export default function App() {
           <Text style={styles.devText}>lastError: {debug.lastError ?? '-'}</Text>
         </View>
       ) : null}
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -563,7 +590,10 @@ function TabButton({
   onPress: () => void;
 }) {
   return (
-    <Pressable style={[styles.tabButton, active && styles.tabButtonActive]} onPress={onPress}>
+    <Pressable
+      style={({ pressed }) => [styles.tabButton, active && styles.tabButtonActive, pressed && styles.buttonPressed]}
+      onPress={onPress}
+    >
       <Text style={[styles.tabButtonText, active && styles.tabButtonTextActive]}>{label}</Text>
     </Pressable>
   );
@@ -689,9 +719,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   header: {
-    paddingTop: 54,
     paddingHorizontal: 16,
     paddingBottom: 10,
+    paddingTop: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
     flexDirection: 'row',
@@ -832,6 +862,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 10,
   },
+  emptyStateCard: {
+    margin: 14,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+    gap: 8,
+  },
+  emptyStateTitle: {
+    color: '#0f172a',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  emptyStateText: {
+    color: '#64748b',
+    fontSize: 13,
+  },
   noteCard: {
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -926,5 +974,8 @@ const styles = StyleSheet.create({
   devText: {
     color: '#cbd5e1',
     fontSize: 11,
+  },
+  buttonPressed: {
+    opacity: 0.75,
   },
 });
