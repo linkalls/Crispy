@@ -1,8 +1,9 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
 import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
+import * as mfm from 'mfm-js';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -10,91 +11,55 @@ import {
   Image,
   Pressable,
   RefreshControl,
-  Share,
   ScrollView,
-  StyleSheet,
+  Share,
   Switch,
   Text,
   TextInput,
   View,
   useColorScheme,
+  Modal,
+  StyleSheet
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import * as mfm from 'mfm-js';
+import {
+  MfmRenderer,
+  Timeline,
+  NoteDetailModal,
+  QuoteComposerModal,
+  RenoteOptionsModal,
+  ReactionPickerModal,
+  ConfirmModal,
+  Toast,
+  BottomNavigation,
+  FAB,
+  NoteComposerModal,
+} from './src/components';
+import { NotificationsScreen, ExploreScreen, ProfileScreen } from './src/screens';
+import { useMisskey, useMisskeyStream } from './src/hooks';
+import { styles } from './src/styles/styles';
+import { darkColors, lightColors } from './src/utils/colors';
+import {
+  DEFAULT_HOST,
+  STORAGE_KEY,
+  createSessionId,
+  mapNote,
+  normalizeHost,
+  toRelativeTime,
+} from './src/utils/formatting';
+import {
+  DebugState,
+  MisskeyMiAuthCheck,
+  MisskeyNote,
+  PersistedState,
+  StoredAccount,
+  TimelineNote,
+  TimelineTab,
+  MainScreenTab
+} from './src/utils/types';
 
 WebBrowser.maybeCompleteAuthSession();
 
-type TimelineTab = 'home' | 'local' | 'global';
-
-type MisskeyUser = {
-  id: string;
-  name?: string | null;
-  username: string;
-  host?: string | null;
-  avatarUrl?: string | null;
-};
-
-type MisskeyNote = {
-  id: string;
-  text?: string | null;
-  cw?: string | null;
-  createdAt: string;
-  user: MisskeyUser;
-  renote?: MisskeyNote | null;
-  reactions?: Record<string, number>;
-  myReaction?: string | null;
-  repliesCount?: number;
-  renoteCount?: number;
-};
-
-type TimelineNote = {
-  id: string;
-  targetId: string;
-  content: string;
-  createdAtLabel: string;
-  user: {
-    name: string;
-    username: string;
-    host: string;
-    avatar: string;
-  };
-  renoteUser: string | null;
-  reactions: Array<{ emoji: string; count: number; reacted: boolean; isCustom: boolean }>;
-  replies: number;
-  renotes: number;
-};
-
-type StoredAccount = {
-  id: string;
-  host: string;
-  token: string;
-  userId: string;
-  username: string;
-  displayName: string;
-  avatarUrl: string;
-};
-
-type PersistedState = {
-  accounts: StoredAccount[];
-  activeAccountId: string | null;
-  devMode: boolean;
-  themeMode?: 'system' | 'light' | 'dark';
-};
-
-type MisskeyMiAuthCheck = {
-  ok: boolean;
-  token: string;
-  user: MisskeyUser;
-};
-
-type DebugState = {
-  lastPath: string;
-  lastStatus: number | null;
-  lastError: string | null;
-};
-
-const STORAGE_KEY = 'crispy:state:v2';
-const DEFAULT_HOST = 'misskey.io';
 const DEFAULT_AVATAR =
   'https://api.dicebear.com/9.x/avataaars/svg?seed=Crispy&backgroundColor=b6e3f4';
 
@@ -108,8 +73,16 @@ export default function App() {
 
 function AppContent() {
   const [hydrated, setHydrated] = useState(false);
-  const [accounts, setAccounts] = useState<StoredAccount[]>([]);
-  const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<StoredAccount[]>([{
+    id: 'test-account',
+    host: 'sushi.ski',
+    token: '',
+    userId: 'test',
+    username: 'testuser',
+    displayName: 'Test User',
+    avatarUrl: DEFAULT_AVATAR
+  }]);
+  const [activeAccountId, setActiveAccountId] = useState<string | null>('test-account');
   const [devMode, setDevMode] = useState(false);
   const [themeMode, setThemeMode] = useState<'system' | 'light' | 'dark'>('system');
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
@@ -120,6 +93,7 @@ function AppContent() {
   const [activeAuthSession, setActiveAuthSession] = useState<{ session: string; host: string } | null>(null);
   const [oauthError, setOauthError] = useState<string | null>(null);
 
+  const [mainTab, setMainTab] = useState<MainScreenTab>('home');
   const [activeTab, setActiveTab] = useState<TimelineTab>('home');
   const [notes, setNotes] = useState<TimelineNote[]>([]);
   const [loadingTimeline, setLoadingTimeline] = useState(false);
@@ -134,14 +108,31 @@ function AppContent() {
     lastError: null,
   });
 
+  // モーダル・投稿関連の状態
+  const [selectedNoteForDetail, setSelectedNoteForDetail] = useState<TimelineNote | null>(null);
+  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
+  const [quotingNote, setQuotingNote] = useState<TimelineNote | null>(null);
+  const [isQuoteComposerVisible, setIsQuoteComposerVisible] = useState(false);
+  const [selectedNoteForRenote, setSelectedNoteForRenote] = useState<TimelineNote | null>(null);
+  const [isRenoteOptionsVisible, setIsRenoteOptionsVisible] = useState(false);
+  const [selectedNoteForReaction, setSelectedNoteForReaction] = useState<TimelineNote | null>(null);
+  const [isReactionPickerVisible, setIsReactionPickerVisible] = useState(false);
+  const [isNoteComposerVisible, setIsNoteComposerVisible] = useState(false);
+  const [toast, setToast] = useState<{ visible: boolean; title: string; message?: string; isError?: boolean }>({ visible: false, title: '' });
+  const [isLogoutConfirmVisible, setIsLogoutConfirmVisible] = useState(false);
+  
+  const showToast = (title: string, message?: string, isError = false) => {
+    setToast({ visible: true, title, message, isError });
+  };
+
   useEffect(() => {
     const load = async () => {
       try {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         if (!raw) return;
         const parsed = JSON.parse(raw) as PersistedState;
-        if (Array.isArray(parsed.accounts)) setAccounts(parsed.accounts);
-        setActiveAccountId(parsed.activeAccountId ?? null);
+        // if (Array.isArray(parsed.accounts)) setAccounts(parsed.accounts);
+        // setActiveAccountId(parsed.activeAccountId ?? null);
         setDevMode(Boolean(parsed.devMode));
         if (parsed.themeMode) setThemeMode(parsed.themeMode);
       } catch {
@@ -174,44 +165,18 @@ function AppContent() {
     [accounts, activeAccountId]
   );
 
-  const misskeyRequest = useCallback(
-    async <T,>(path: string, payload: Record<string, unknown>, requiresAuth = false): Promise<T> => {
-      if (!activeAccount) {
-        throw new Error('先にログインしてください。');
-      }
+  const { misskeyRequest } = useMisskey(activeAccount);
+  const { isConnected, lastMessage } = useMisskeyStream(activeAccount);
 
-      if (requiresAuth && !activeAccount.token) {
-        throw new Error('認証が必要です。');
-      }
-
-      const response = await fetch(`https://${activeAccount.host}${path}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ ...payload, i: activeAccount.token }),
+  useEffect(() => {
+    if (lastMessage && mainTab === 'home' && activeTab === 'home') {
+      setNotes((prev) => {
+        const exists = prev.find(n => n.id === lastMessage.id);
+        if (exists) return prev;
+        return [mapNote(lastMessage, activeAccount?.host || DEFAULT_HOST), ...prev];
       });
-
-      setDebug((current) => ({
-        ...current,
-        lastPath: path,
-        lastStatus: response.status,
-        lastError: null,
-      }));
-
-      if (!response.ok) {
-        throw new Error(`Misskey API error: ${response.status}`);
-      }
-
-      if (response.status === 204) {
-        return {} as T;
-      }
-
-      const text = await response.text();
-      return (text ? JSON.parse(text) : {}) as T;
-    },
-    [activeAccount]
-  );
+    }
+  }, [lastMessage, activeAccount?.host, mainTab, activeTab]);
 
   const loadTimeline = useCallback(
     async (isRefresh = false) => {
@@ -261,7 +226,7 @@ function AppContent() {
       return;
     }
     loadTimeline(false);
-  }, [activeAccount, activeTab, loadTimeline]);
+  }, [activeAccount, activeTab]);
 
   const finishMiAuthLogin = useCallback(async (session: string, host: string) => {
     const hadActiveAccount = Boolean(activeAccountId);
@@ -427,36 +392,65 @@ function AppContent() {
           return { ...item, reactions };
         })
       );
-      Alert.alert('失敗', error instanceof Error ? error.message : 'リアクション更新に失敗しました。');
+      showToast('失敗', error instanceof Error ? error.message : 'リアクション更新に失敗しました。', true);
     }
   };
 
-  const handleRenote = async (note: TimelineNote) => {
+  const performReaction = async (note: TimelineNote, reaction: string) => {
+    if (!activeAccount) return;
+    try {
+      await misskeyRequest('/api/notes/reactions/create', { noteId: note.targetId, reaction }, true);
+      showToast('成功', 'リアクションしました。');
+      loadTimeline(true);
+    } catch (error) {
+      showToast('失敗', error instanceof Error ? error.message : 'リアクションに失敗しました。', true);
+    }
+  };
+
+  const performPureRenote = async (note: TimelineNote) => {
     setNotes((current) =>
       current.map((item) =>
         item.id === note.id
           ? {
-              ...item,
-              renotes: item.renotes + 1,
-            }
+            ...item,
+            renotes: item.renotes + 1,
+          }
           : item
       )
     );
 
     try {
       await misskeyRequest('/api/notes/create', { renoteId: note.targetId }, true);
+      showToast('成功', 'リポストしました。');
     } catch (error) {
       setNotes((current) =>
         current.map((item) =>
           item.id === note.id
             ? {
-                ...item,
-                renotes: Math.max(0, item.renotes - 1),
-              }
+              ...item,
+              renotes: Math.max(0, item.renotes - 1),
+            }
             : item
         )
       );
-      Alert.alert('失敗', error instanceof Error ? error.message : 'リポストに失敗しました。');
+      showToast('失敗', error instanceof Error ? error.message : 'リポストに失敗しました。', true);
+    }
+  };
+
+  const handleRenoteOptions = (note: TimelineNote) => {
+    setSelectedNoteForRenote(note);
+    setIsRenoteOptionsVisible(true);
+  };
+
+  const handleQuoteSubmit = async (text: string) => {
+    if (!quotingNote || !activeAccount) return;
+    try {
+      await misskeyRequest('/api/notes/create', { text, renoteId: quotingNote.targetId }, true);
+      showToast('成功', '引用リポストを投稿しました。');
+      loadTimeline(true);
+    } catch (error) {
+      showToast('失敗', error instanceof Error ? error.message : '引用リポストに失敗しました。', true);
+      throw error;
     }
   };
 
@@ -464,15 +458,15 @@ function AppContent() {
     const noteUrl = `https://${note.user.host}/notes/${note.targetId}`;
     try {
       await Share.share({ message: noteUrl, url: noteUrl });
-    } catch {
-      Alert.alert('失敗', '共有を開始できませんでした。');
+    } catch (error) {
+      showToast('失敗', '共有を開始できませんでした。', true);
     }
   };
 
   const handleReplySubmit = async (note: TimelineNote) => {
     const text = replyText.trim();
     if (!text) {
-      Alert.alert('入力エラー', '返信内容を入力してください。');
+      showToast('入力エラー', '返信内容を入力してください。', true);
       return;
     }
 
@@ -482,8 +476,9 @@ function AppContent() {
       setReplyText('');
       setReplyingNoteId(null);
       loadTimeline(true);
+      showToast('成功', '返信しました。');
     } catch (error) {
-      Alert.alert('失敗', error instanceof Error ? error.message : '返信に失敗しました。');
+      showToast('失敗', error instanceof Error ? error.message : '返信に失敗しました。', true);
     } finally {
       setSendingReply(false);
     }
@@ -498,16 +493,15 @@ function AppContent() {
     });
   };
 
+  const confirmLogout = () => {
+    if (!activeAccount) return;
+    removeAccount(activeAccount.id);
+    setIsLogoutConfirmVisible(false);
+  };
+
   const logoutCurrent = () => {
     if (!activeAccount) return;
-    Alert.alert('ログアウト', `${activeAccount.displayName} を削除しますか？`, [
-      { text: 'キャンセル', style: 'cancel' },
-      {
-        text: '削除',
-        style: 'destructive',
-        onPress: () => removeAccount(activeAccount.id),
-      },
-    ]);
+    setIsLogoutConfirmVisible(true);
   };
 
   if (!hydrated) {
@@ -601,28 +595,38 @@ function AppContent() {
         <TabButton label="Global" active={activeTab === 'global'} onPress={() => setActiveTab('global')} colors={colors} />
       </View>
 
-      {accountMenuOpen ? (
-        <>
+      <Modal
+        visible={accountMenuOpen}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          setAccountMenuOpen(false);
+          setAddingAccount(false);
+          setOauthError(null);
+        }}
+      >
+        <SafeAreaView style={{ flex: 1, justifyContent: "flex-end" }}>
           <Pressable
-            style={styles.accountMenuBackdrop}
+            style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
             onPress={() => {
               setAccountMenuOpen(false);
               setAddingAccount(false);
               setOauthError(null);
             }}
           />
-          <View style={[styles.accountMenuPanel, { backgroundColor: colors.settingsBg, borderColor: colors.border }]}>
+          <View style={[styles.accountMenuPanel, { backgroundColor: colors.bg, paddingBottom: 32 }]}>
+            <View style={styles.bottomSheetHandle} />
             <Text style={[styles.settingsTitle, { color: colors.text }]}>アカウント</Text>
 
             <View style={styles.devModeRow}>
-              <Text style={[styles.devModeLabel, { color: colors.text }]}>テーマ設定: {themeMode}</Text>
+              <Text style={[styles.devModeLabel, { color: colors.text }]}>テーマ: {themeMode}</Text>
               <Pressable
                 onPress={() =>
                   setThemeMode((m) => (m === 'system' ? 'light' : m === 'light' ? 'dark' : 'system'))
                 }
-                style={{ padding: 8, backgroundColor: colors.border, borderRadius: 8 }}
+                style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: colors.border, borderRadius: 16 }}
               >
-                <Text style={{ color: colors.text }}>{themeMode}</Text>
+                <Text style={{ color: colors.text, fontWeight: '700' }}>切替</Text>
               </Pressable>
             </View>
 
@@ -644,34 +648,34 @@ function AppContent() {
                   }}
                 >
                   <Image source={{ uri: account.avatarUrl }} style={styles.accountAvatar} />
-                  <View>
-                    <Text style={[styles.accountName, { color: colors.text }]}>{account.displayName}</Text>
-                    <Text style={[styles.accountHost, { color: colors.textMuted }]}>@{account.username} · {account.host}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.accountName, { color: colors.text }]} numberOfLines={1}>{account.displayName}</Text>
+                    <Text style={[styles.accountHost, { color: colors.textMuted }]} numberOfLines={1}>@{account.username} · {account.host}</Text>
                   </View>
+                  {activeAccountId === account.id && (
+                    <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                  )}
                 </Pressable>
-                <Pressable onPress={() => removeAccount(account.id)} style={styles.removeAccountButton}>
-                  <Ionicons name="trash-outline" size={16} color="#ef4444" />
-                </Pressable>
+                {activeAccountId !== account.id && (
+                  <Pressable onPress={() => removeAccount(account.id)} style={styles.removeAccountButton}>
+                    <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                  </Pressable>
+                )}
               </View>
             ))}
 
-            <Pressable style={[styles.secondaryButton, { backgroundColor: colors.reactionBg }]} onPress={logoutCurrent}>
-              <Text style={[styles.secondaryButtonText, { color: colors.primaryText }]}>現在アカウントを削除</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.secondaryButton, { backgroundColor: colors.reactionBg }]}
-              onPress={() => {
-                setServerHostInput(activeAccount.host);
-                setOauthError(null);
-                setAddingAccount(true);
-              }}
-            >
-              <Text style={[styles.secondaryButtonText, { color: colors.primaryText }]}>別アカウントを追加</Text>
+            <Pressable style={styles.addAccountBtn} onPress={() => {
+              setServerHostInput(activeAccount.host);
+              setOauthError(null);
+              setAddingAccount(true);
+            }}>
+              <Ionicons name="add-outline" size={20} color={colors.primary} />
+              <Text style={[styles.addAccountBtnText, { color: colors.primary }]}>既存のアカウントを追加</Text>
             </Pressable>
 
             {addingAccount ? (
               <View style={[styles.addAccountCard, { borderColor: colors.border, backgroundColor: colors.cardBg }]}>
-                <Text style={[styles.addAccountTitle, { color: colors.text }]}>別アカウントを追加</Text>
+                <Text style={[styles.addAccountTitle, { color: colors.text }]}>新しいアカウント</Text>
                 <TextInput
                   value={serverHostInput}
                   onChangeText={setServerHostInput}
@@ -706,140 +710,134 @@ function AppContent() {
                     {oauthLoading ? <ActivityIndicator size="small" color="#ffffff" /> : <Text style={styles.addAccountLoginText}>ログイン</Text>}
                   </Pressable>
                 </View>
-                {oauthError ? <Text style={styles.oauthErrorText}>{oauthError}</Text> : null}
+                {oauthError ? <Text style={styles.errorText}>{oauthError}</Text> : null}
               </View>
             ) : null}
+
+            <Pressable style={styles.logoutBtn} onPress={logoutCurrent}>
+              <Text style={styles.logoutBtnText}>@ {activeAccount.username} をログアウト</Text>
+            </Pressable>
           </View>
-        </>
-      ) : null}
+        </SafeAreaView>
+      </Modal>
 
-      {loadingTimeline ? (
-        <View style={styles.timelineLoading}>
-          <ActivityIndicator size="large" color="#1d9bf0" />
-          <Text style={[styles.timelineLoadingText, { color: colors.textMuted }]}>タイムラインを読み込み中...</Text>
-        </View>
-      ) : (
-        <ScrollView
-          style={styles.timeline}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadTimeline(true)} />}
-          showsVerticalScrollIndicator={false}
-        >
-          {timelineError ? <Text style={styles.timelineError}>{timelineError}</Text> : null}
-          {!timelineError && notes.length === 0 ? (
-            <View style={[styles.emptyStateCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-              <Text style={[styles.emptyStateTitle, { color: colors.text }]}>表示できるノートがありません</Text>
-              <Text style={[styles.emptyStateText, { color: colors.textMuted }]}>少し待ってから再読み込みしてください。</Text>
-              <Pressable
-                style={({ pressed }) => [styles.secondaryButton, { backgroundColor: colors.reactionBg }, pressed && styles.buttonPressed]}
-                onPress={() => loadTimeline(true)}
-              >
-                <Text style={[styles.secondaryButtonText, { color: colors.primaryText }]}>再読み込み</Text>
-              </Pressable>
-            </View>
-          ) : null}
-
-          {notes.map((note) => (
-            <View key={note.id} style={[styles.noteCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-              {note.renoteUser ? <Text style={[styles.renoteText, { color: colors.textMuted }]}>{note.renoteUser} がリノート</Text> : null}
-              <View style={styles.noteRow}>
-                <Image source={{ uri: note.user.avatar }} style={styles.noteAvatar} />
-                <View style={styles.noteMain}>
-                  <View style={styles.noteHeaderRow}>
-                    <Text style={[styles.noteName, { color: colors.text }]}>{note.user.name}</Text>
-                    <Text style={[styles.noteMeta, { color: colors.textMuted }]}>
-                      @{note.user.username}@{note.user.host} · {note.createdAtLabel}
-                    </Text>
-                  </View>
-                  <MfmRenderer nodes={mfm.parseSimple(note.content)} colors={colors} />
-
-                  <View style={styles.noteActions}>
-                    <Text style={[styles.noteCount, { color: colors.textMuted }]}>💬 {note.replies}</Text>
-                    <Text style={[styles.noteCount, { color: colors.textMuted }]}>🔁 {note.renotes}</Text>
-                  </View>
-
-                  <View style={styles.primaryActionsRow}>
-                    <Pressable
-                      style={({ pressed }) => [styles.actionButton, { borderColor: colors.border }, pressed && styles.buttonPressed]}
-                      onPress={() => {
-                        if (replyingNoteId === note.id) {
-                          setReplyingNoteId(null);
-                          setReplyText('');
-                          return;
-                        }
-                        setReplyingNoteId(note.id);
-                        setReplyText(`@${note.user.username} `);
-                      }}
-                    >
-                      <Ionicons name="chatbubble-outline" size={14} color={colors.textMuted} />
-                      <Text style={[styles.actionText, { color: colors.textMuted }]}>返信</Text>
-                    </Pressable>
-                    <Pressable
-                      style={({ pressed }) => [styles.actionButton, { borderColor: colors.border }, pressed && styles.buttonPressed]}
-                      onPress={() => handleRenote(note)}
-                    >
-                      <Ionicons name="repeat-outline" size={14} color={colors.textMuted} />
-                      <Text style={[styles.actionText, { color: colors.textMuted }]}>リポスト</Text>
-                    </Pressable>
-                    <Pressable
-                      style={({ pressed }) => [styles.actionButton, { borderColor: colors.border }, pressed && styles.buttonPressed]}
-                      onPress={() => handleShare(note)}
-                    >
-                      <Ionicons name="share-social-outline" size={14} color={colors.textMuted} />
-                      <Text style={[styles.actionText, { color: colors.textMuted }]}>Share</Text>
-                    </Pressable>
-                  </View>
-
-                  {replyingNoteId === note.id ? (
-                    <View style={[styles.replyComposer, { borderColor: colors.border, backgroundColor: colors.bg }]}>
-                      <TextInput
-                        value={replyText}
-                        onChangeText={setReplyText}
-                        style={[styles.replyInput, { color: colors.text }]}
-                        multiline
-                        placeholder="返信を入力"
-                        placeholderTextColor={colors.textMuted}
-                      />
-                      <Pressable
-                        style={({ pressed }) => [
-                          styles.replySendButton,
-                          { backgroundColor: colors.primary },
-                          (sendingReply || !replyText.trim()) && styles.replySendButtonDisabled,
-                          pressed && styles.buttonPressed,
-                        ]}
-                        onPress={() => handleReplySubmit(note)}
-                        disabled={sendingReply || !replyText.trim()}
-                      >
-                        {sendingReply ? (
-                          <ActivityIndicator size="small" color="#ffffff" />
-                        ) : (
-                          <Text style={styles.replySendText}>送信</Text>
-                        )}
-                      </Pressable>
-                    </View>
-                  ) : null}
-
-                  <View style={styles.reactionWrap}>
-                    {note.reactions.slice(0, 6).map((reaction, index) => (
-                      <Pressable
-                        key={`${note.id}-${reaction.emoji}-${index}`}
-                        style={({ pressed }) => [
-                          styles.reactionButton, { backgroundColor: colors.reactionBg, borderColor: colors.reactionBorder },
-                          reaction.reacted && [styles.reactionActive, { backgroundColor: colors.reactionActiveBg, borderColor: colors.reactionActiveBorder }],
-                          pressed && styles.buttonPressed,
-                        ]}
-                        onPress={() => handleReactionToggle(note.id, index)}
-                      >
-                        <Text style={[styles.reactionText, { color: colors.text }]}>{reaction.emoji}</Text>
-                        <Text style={[styles.reactionCount, { color: colors.textMuted }]}>{reaction.count}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-              </View>
-            </View>
-          ))}
-        </ScrollView>
+      {mainTab === 'home' && (
+        <Timeline
+          notes={notes}
+          isLoading={loadingTimeline}
+          isRefreshing={refreshing}
+          error={timelineError}
+          replyingNoteId={replyingNoteId}
+          replyText={replyText}
+          isSendingReply={sendingReply}
+          colors={colors}
+          onRefresh={() => loadTimeline(true)}
+          onReplyPress={(noteId) => {
+            if (replyingNoteId === noteId) {
+              setReplyingNoteId(null);
+              setReplyText('');
+            } else {
+              const note = notes.find((n) => n.id === noteId);
+              setReplyingNoteId(noteId);
+              setReplyText(note ? `@${note.user.username} ` : '');
+            }
+          }}
+          onReplyTextChange={setReplyText}
+          onReplySubmit={() => {
+            const note = notes.find((n) => n.id === replyingNoteId);
+            if (note) handleReplySubmit(note);
+          }}
+          onRenotePress={handleRenoteOptions}
+          onSharePress={handleShare}
+          onReactionPress={handleReactionToggle}
+          onNotePress={(note) => {
+            setSelectedNoteForDetail(note);
+            setIsDetailModalVisible(true);
+          }}
+        />
       )}
+      {mainTab === 'explore' && <ExploreScreen colors={colors} />}
+      {mainTab === 'notifications' && <NotificationsScreen colors={colors} activeAccount={activeAccount} misskeyRequest={misskeyRequest} />}
+      {mainTab === 'profile' && <ProfileScreen colors={colors} activeAccount={activeAccount} misskeyRequest={misskeyRequest} />}
+
+
+      <NoteDetailModal
+        visible={isDetailModalVisible}
+        note={selectedNoteForDetail}
+        colors={colors}
+        activeAccountHost={activeAccount.host}
+        misskeyRequest={misskeyRequest}
+        onShowToast={showToast}
+        onClose={() => {
+          setIsDetailModalVisible(false);
+          setSelectedNoteForDetail(null);
+        }}
+        onReactionPress={handleReactionToggle}
+        onRenotePress={handleRenoteOptions}
+        onSharePress={handleShare}
+        onReplySubmitSuccess={() => {
+          loadTimeline(true);
+        }}
+      />
+
+      <QuoteComposerModal
+        visible={isQuoteComposerVisible}
+        note={quotingNote}
+        colors={colors}
+        onClose={() => {
+          setIsQuoteComposerVisible(false);
+          setQuotingNote(null);
+        }}
+        onSubmit={handleQuoteSubmit}
+      />
+
+      <RenoteOptionsModal
+        visible={isRenoteOptionsVisible}
+        note={selectedNoteForRenote}
+        colors={colors}
+        onClose={() => {
+          setIsRenoteOptionsVisible(false);
+          setSelectedNoteForRenote(null);
+        }}
+        onRenote={performPureRenote}
+        onQuote={(note) => {
+          setQuotingNote(note);
+          setIsQuoteComposerVisible(true);
+        }}
+      />
+
+      <ReactionPickerModal
+        visible={isReactionPickerVisible}
+        note={selectedNoteForReaction}
+        colors={colors}
+        onClose={() => {
+          setIsReactionPickerVisible(false);
+          setSelectedNoteForReaction(null);
+        }}
+        onSelectReaction={(note, reaction) => {
+          performReaction(note, reaction);
+        }}
+      />
+
+      <ConfirmModal
+        visible={isLogoutConfirmVisible}
+        title="ログアウト"
+        message={`${activeAccount?.displayName || 'このアカウント'} を削除しますか？`}
+        confirmText="ログアウト"
+        isDanger={true}
+        colors={colors}
+        onConfirm={confirmLogout}
+        onClose={() => setIsLogoutConfirmVisible(false)}
+      />
+
+      <Toast
+        visible={toast.visible}
+        title={toast.title}
+        message={toast.message}
+        isError={toast.isError}
+        colors={colors}
+        onHide={() => setToast(prev => ({ ...prev, visible: false }))}
+      />
 
       {devMode ? (
         <View style={styles.devPanel}>
@@ -847,11 +845,33 @@ function AppContent() {
           <Text style={styles.devText}>accountId: {activeAccount.id}</Text>
           <Text style={styles.devText}>host: {activeAccount.host}</Text>
           <Text style={styles.devText}>tab: {activeTab}</Text>
+          <Text style={styles.devText}>WS: {isConnected ? 'Connected' : 'Disconnected'}</Text>
           <Text style={styles.devText}>lastPath: {debug.lastPath || '-'}</Text>
           <Text style={styles.devText}>lastStatus: {debug.lastStatus ?? '-'}</Text>
           <Text style={styles.devText}>lastError: {debug.lastError ?? '-'}</Text>
         </View>
       ) : null}
+
+      {activeAccount && (
+        <FAB onPress={() => setIsNoteComposerVisible(true)} colors={colors} />
+      )}
+      
+      <BottomNavigation activeTab={mainTab} onTabChange={setMainTab} colors={colors} />
+
+      <NoteComposerModal
+        visible={isNoteComposerVisible}
+        colors={colors}
+        activeAccount={activeAccount}
+        onClose={() => setIsNoteComposerVisible(false)}
+        onSubmit={async (text, cw, visibility, fileIds) => {
+          try {
+            await misskeyRequest('/api/notes/create', { text, cw, visibility, fileIds: fileIds.length > 0 ? fileIds : undefined }, true);
+            showToast('投稿しました');
+          } catch (e) {
+            showToast('投稿に失敗しました', undefined, true);
+          }
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -878,656 +898,4 @@ function TabButton({
 }
 
 
-function MfmRenderer({ nodes, colors }: { nodes: mfm.MfmNode[]; colors: any }) {
-  const renderNodes = (targetNodes: mfm.MfmNode[], keyPrefix: string) =>
-    targetNodes.map((node, i) => {
-      const key = `${keyPrefix}-${i}`;
-      if (node.type === 'text') {
-        return (
-          <Text key={key} style={{ color: colors.text }}>
-            {node.props.text}
-          </Text>
-        );
-      }
-      if (node.type === 'unicodeEmoji') {
-        return <Text key={key}>{node.props.emoji}</Text>;
-      }
-      if (node.type === 'emojiCode') {
-        return (
-          <Text key={key} style={{ color: colors.text }}>
-            :{node.props.name}:
-          </Text>
-        );
-      }
-      if (node.type === 'url') {
-        return (
-          <Text key={key} style={{ color: colors.primaryText, textDecorationLine: 'underline' }} onPress={() => Linking.openURL(node.props.url)}>
-            {node.props.url}
-          </Text>
-        );
-      }
-      if (node.type === 'link') {
-        return (
-          <Text key={key} style={{ color: colors.primaryText, textDecorationLine: 'underline' }} onPress={() => Linking.openURL(node.props.url)}>
-            {renderNodes(node.children, key)}
-          </Text>
-        );
-      }
-      if (node.type === 'mention') {
-        return (
-          <Text key={key} style={{ color: colors.primaryText }}>
-            {node.props.acct}
-          </Text>
-        );
-      }
-      if (node.type === 'hashtag') {
-        return (
-          <Text key={key} style={{ color: colors.primaryText }}>
-            #{node.props.hashtag}
-          </Text>
-        );
-      }
-      if (node.type === 'bold') {
-        return (
-          <Text key={key} style={{ fontWeight: 'bold', color: colors.text }}>
-            {renderNodes(node.children, key)}
-          </Text>
-        );
-      }
-      if (node.type === 'italic') {
-        return (
-          <Text key={key} style={{ fontStyle: 'italic', color: colors.text }}>
-            {renderNodes(node.children, key)}
-          </Text>
-        );
-      }
-      if (node.type === 'strike') {
-        return (
-          <Text key={key} style={{ textDecorationLine: 'line-through', color: colors.text }}>
-            {renderNodes(node.children, key)}
-          </Text>
-        );
-      }
-      if (node.type === 'quote') {
-        return (
-          <Text key={key} style={{ color: colors.textMuted }}>
-            {'\n'}
-            {'「'}
-            {renderNodes(node.children, key)}
-            {'」'}
-            {'\n'}
-          </Text>
-        );
-      }
-      if ('children' in node && Array.isArray(node.children)) {
-        return (
-          <Text key={key} style={{ color: colors.text }}>
-            {renderNodes(node.children, key)}
-          </Text>
-        );
-      }
-      return null;
-    });
-
-  return <Text style={[styles.noteContent, { color: colors.text }]}>{renderNodes(nodes, 'node')}</Text>;
-}
-
-function normalizeHost(input: string): string {
-  return input.replace(/^https?:\/\//i, '').replace(/\/+$/, '').trim();
-}
-
-function createSessionId(): string {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`;
-}
-
-function toRelativeTime(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const sec = Math.floor(ms / 1000);
-  if (!Number.isFinite(sec) || sec < 0) return '';
-  if (sec < 60) return `${sec}s`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m`;
-  const hour = Math.floor(min / 60);
-  if (hour < 24) return `${hour}h`;
-  return `${Math.floor(hour / 24)}d`;
-}
-
-function mapNote(note: MisskeyNote, fallbackHost: string): TimelineNote {
-  const target = note.renote && !note.text ? note.renote : note;
-  const content = [target.cw, target.text].filter(Boolean).join('\n');
-
-  return {
-    id: note.id,
-    targetId: target.id,
-    content: content || '(no text)',
-    createdAtLabel: toRelativeTime(target.createdAt),
-    user: {
-      name: target.user.name || target.user.username,
-      username: target.user.username,
-      host: target.user.host || fallbackHost,
-      avatar: target.user.avatarUrl || DEFAULT_AVATAR,
-    },
-    renoteUser: note.renote ? note.user.name || note.user.username : null,
-    reactions: Object.entries(target.reactions || {}).map(([emoji, count]) => ({
-      emoji,
-      count,
-      reacted: target.myReaction === emoji,
-      isCustom: emoji.startsWith(':'),
-    })),
-    replies: target.repliesCount ?? 0,
-    renotes: target.renoteCount ?? 0,
-  };
-}
-
-
-const lightColors = {
-  bg: '#f6f8ff',
-  cardBg: '#ffffff',
-  text: '#0f172a',
-  textMuted: '#64748b',
-  border: '#dbeafe',
-  primary: '#2563eb',
-  primaryText: '#1d4ed8',
-  tabBg: '#eaf1ff',
-  tabActiveBg: '#ffffff',
-  tabText: '#475569',
-  tabActiveText: '#1e40af',
-  headerBg: '#ffffff',
-  settingsBg: '#f8fbff',
-  reactionBg: '#f8fbff',
-  reactionBorder: '#dbeafe',
-  reactionActiveBg: '#dbeafe',
-  reactionActiveBorder: '#60a5fa',
-};
-
-const darkColors = {
-  bg: '#0f172a',
-  cardBg: '#1e293b',
-  text: '#f8fafc',
-  textMuted: '#94a3b8',
-  border: '#334155',
-  primary: '#3b82f6',
-  primaryText: '#60a5fa',
-  tabBg: '#1e293b',
-  tabActiveBg: '#334155',
-  tabText: '#94a3b8',
-  tabActiveText: '#f8fafc',
-  headerBg: '#0f172a',
-  settingsBg: '#1e293b',
-  reactionBg: '#1e293b',
-  reactionBorder: '#334155',
-  reactionActiveBg: '#334155',
-  reactionActiveBorder: '#3b82f6',
-};
-
-const styles = StyleSheet.create({
-  centerLoading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f3f6ff',
-    gap: 12,
-  },
-  centerLoadingText: {
-    color: '#4b5563',
-    fontWeight: '600',
-  },
-  onboardingScreen: {
-    flex: 1,
-    backgroundColor: '#eef3ff',
-    justifyContent: 'center',
-    padding: 22,
-  },
-  onboardingCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: '#dbe5ff',
-    gap: 14,
-    shadowColor: '#1e3a8a',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 18,
-    elevation: 4,
-  },
-  onboardingBrand: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  onboardingBrandIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#2563eb',
-  },
-  onboardingBrandText: {
-    color: '#1e3a8a',
-    fontWeight: '900',
-    fontSize: 18,
-  },
-  onboardingTitle: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: '#0f172a',
-  },
-  onboardingSubTitle: {
-    color: '#475569',
-    fontSize: 16,
-    marginBottom: 6,
-  },
-  inputLabel: {
-    color: '#334155',
-    fontWeight: '700',
-  },
-  onboardingInput: {
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: '#0f172a',
-    backgroundColor: '#f8fbff',
-  },
-  oauthButton: {
-    backgroundColor: '#2563eb',
-    height: 50,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#1d4ed8',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.24,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  oauthButtonText: {
-    color: '#fff',
-    fontWeight: '800',
-    fontSize: 16,
-  },
-  oauthErrorText: {
-    color: '#dc2626',
-    fontSize: 12,
-  },
-  onboardingHint: {
-    color: '#64748b',
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: '#f6f8ff',
-  },
-  header: {
-    paddingHorizontal: 14,
-    paddingBottom: 10,
-    paddingTop: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  headerAccountButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  headerAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: '#dbeafe',
-  },
-  headerAppName: {
-    color: '#1d4ed8',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-  },
-  headerName: {
-    fontWeight: '900',
-    fontSize: 16,
-    color: '#0f172a',
-  },
-  headerMeta: {
-    color: '#64748b',
-    fontSize: 12,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    marginHorizontal: 10,
-    marginTop: 8,
-    backgroundColor: '#eaf1ff',
-    borderRadius: 14,
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 10,
-  },
-  tabButtonActive: {
-    backgroundColor: '#ffffff',
-  },
-  tabButtonText: {
-    color: '#475569',
-    fontWeight: '700',
-  },
-  tabButtonTextActive: {
-    color: '#1e40af',
-  },
-  accountMenuPanel: {
-    borderWidth: 1,
-    borderColor: '#dbeafe',
-    backgroundColor: '#f8fbff',
-    marginHorizontal: 12,
-    marginTop: 2,
-    borderRadius: 14,
-    padding: 12,
-    gap: 10,
-    position: 'absolute',
-    right: 12,
-    top: 66,
-    width: '84%',
-    zIndex: 50,
-  },
-  accountMenuBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 40,
-  },
-  settingsTitle: {
-    fontWeight: '900',
-    fontSize: 16,
-    color: '#0f172a',
-  },
-  devModeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  devModeLabel: {
-    color: '#1e293b',
-    fontWeight: '700',
-  },
-  accountSectionTitle: {
-    color: '#334155',
-    fontWeight: '800',
-    marginTop: 2,
-  },
-  accountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  accountMain: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-  },
-  accountAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-  },
-  accountName: {
-    color: '#0f172a',
-    fontWeight: '700',
-  },
-  accountHost: {
-    color: '#64748b',
-    fontSize: 12,
-  },
-  removeAccountButton: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  secondaryButton: {
-    backgroundColor: '#dbeafe',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 11,
-  },
-  secondaryButtonText: {
-    color: '#1e3a8a',
-    fontWeight: '700',
-  },
-  addAccountCard: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 10,
-    gap: 8,
-  },
-  addAccountTitle: {
-    fontWeight: '800',
-    fontSize: 13,
-  },
-  addAccountInput: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-  },
-  addAccountActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  addAccountActionButton: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 38,
-  },
-  addAccountCancelText: {
-    fontWeight: '700',
-  },
-  addAccountLoginText: {
-    color: '#ffffff',
-    fontWeight: '800',
-  },
-  timelineLoading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  timelineLoadingText: {
-    color: '#64748b',
-  },
-  timeline: {
-    flex: 1,
-    marginTop: 6,
-  },
-  timelineError: {
-    color: '#dc2626',
-    paddingHorizontal: 16,
-    paddingTop: 10,
-  },
-  emptyStateCard: {
-    margin: 14,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#dbeafe',
-    backgroundColor: '#ffffff',
-    gap: 10,
-  },
-  emptyStateTitle: {
-    color: '#0f172a',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  emptyStateText: {
-    color: '#64748b',
-    fontSize: 13,
-  },
-  noteCard: {
-    marginHorizontal: 12,
-    marginBottom: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#dbeafe',
-    backgroundColor: '#ffffff',
-  },
-  renoteText: {
-    color: '#64748b',
-    fontSize: 11,
-    marginBottom: 6,
-    marginLeft: 0,
-  },
-  noteRow: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'flex-start',
-  },
-  noteAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-  },
-  noteMain: {
-    flex: 1,
-    gap: 6,
-    minWidth: 0,
-  },
-  noteHeaderRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 6,
-  },
-  noteName: {
-    color: '#0f172a',
-    fontWeight: '800',
-  },
-  noteMeta: {
-    color: '#64748b',
-    fontSize: 12,
-  },
-  noteContent: {
-    color: '#0f172a',
-    fontSize: 15,
-    lineHeight: 21,
-  },
-  noteActions: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  primaryActionsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  actionText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  noteCount: {
-    color: '#64748b',
-    fontSize: 12,
-  },
-  reactionWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  replyComposer: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 8,
-    gap: 8,
-  },
-  replyInput: {
-    minHeight: 48,
-    textAlignVertical: 'top',
-    fontSize: 14,
-  },
-  replySendButton: {
-    alignSelf: 'flex-end',
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-  },
-  replySendButtonDisabled: {
-    opacity: 0.6,
-  },
-  replySendText: {
-    color: '#ffffff',
-    fontWeight: '800',
-    fontSize: 12,
-  },
-  reactionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#dbeafe',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    gap: 4,
-    backgroundColor: '#f8fbff',
-  },
-  reactionActive: {
-    borderColor: '#60a5fa',
-    backgroundColor: '#dbeafe',
-  },
-  reactionText: {
-    fontSize: 12,
-  },
-  reactionCount: {
-    color: '#334155',
-    fontSize: 11,
-  },
-  devPanel: {
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    backgroundColor: '#0f172a',
-    padding: 10,
-    gap: 2,
-  },
-  devTitle: {
-    color: '#f8fafc',
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  devText: {
-    color: '#cbd5e1',
-    fontSize: 11,
-  },
-  buttonPressed: {
-    opacity: 0.75,
-  },
-});
+// Helper functions imported from formatting utilities

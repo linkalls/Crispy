@@ -1,0 +1,41 @@
+import { ColorScheme } from "./types";
+
+export const lightColors: ColorScheme = {
+  bg: "#f6f8ff",
+  cardBg: "#ffffff",
+  text: "#0f172a",
+  textMuted: "#64748b",
+  border: "#dbeafe",
+  primary: "#2563eb",
+  primaryText: "#1d4ed8",
+  tabBg: "#eaf1ff",
+  tabActiveBg: "#ffffff",
+  tabText: "#475569",
+  tabActiveText: "#1e40af",
+  headerBg: "#ffffff",
+  settingsBg: "#f8fbff",
+  reactionBg: "#f8fbff",
+  reactionBorder: "#dbeafe",
+  reactionActiveBg: "#dbeafe",
+  reactionActiveBorder: "#60a5fa",
+};
+
+export const darkColors: ColorScheme = {
+  bg: "#0f172a",
+  cardBg: "#1e293b",
+  text: "#f8fafc",
+  textMuted: "#94a3b8",
+  border: "#334155",
+  primary: "#3b82f6",
+  primaryText: "#60a5fa",
+  tabBg: "#1e293b",
+  tabActiveBg: "#334155",
+  tabText: "#94a3b8",
+  tabActiveText: "#f8fafc",
+  headerBg: "#0f172a",
+  settingsBg: "#1e293b",
+  reactionBg: "#1e293b",
+  reactionBorder: "#334155",
+  reactionActiveBg: "#334155",
+  reactionActiveBorder: "#3b82f6",
+};
