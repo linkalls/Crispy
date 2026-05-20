@@ -33,3 +33,8 @@ bun run web
 - 初回起動オンボーディング + OAuth ログイン
 - 複数アカウントの追加 / 切り替え / 削除
 - 設定の `devモード` で API 詳細情報を表示
+
+## CI (GitHub Actions)
+
+- `Android APK Build` workflowでAPKをビルド
+- `crispy-android-apk` artifactとして `app-debug.apk` をアップロード
