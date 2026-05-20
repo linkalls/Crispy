@@ -401,7 +401,13 @@ export default function App() {
       <SafeAreaView style={styles.onboardingScreen}>
         <StatusBar style="dark" />
         <View style={styles.onboardingCard}>
-          <Text style={styles.onboardingTitle}>Crispy</Text>
+          <View style={styles.onboardingBrand}>
+            <View style={styles.onboardingBrandIcon}>
+              <Ionicons name="sparkles" size={20} color="#ffffff" />
+            </View>
+            <Text style={styles.onboardingBrandText}>Crispy</Text>
+          </View>
+          <Text style={styles.onboardingTitle}>Misskeyをもっと快適に</Text>
           <Text style={styles.onboardingSubTitle}>Misskey にログインしてはじめる</Text>
 
           <Text style={styles.inputLabel}>サーバー</Text>
@@ -447,6 +453,7 @@ export default function App() {
         <View style={styles.headerLeft}>
           <Image source={{ uri: activeAccount.avatarUrl }} style={styles.headerAvatar} />
           <View>
+            <Text style={styles.headerAppName}>Crispy</Text>
             <Text style={styles.headerName}>{activeAccount.displayName}</Text>
             <Text style={styles.headerMeta}>@{activeAccount.username} · {activeAccount.host}</Text>
           </View>
@@ -533,7 +540,9 @@ export default function App() {
                 <View style={styles.noteMain}>
                   <View style={styles.noteHeaderRow}>
                     <Text style={styles.noteName}>{note.user.name}</Text>
-                    <Text style={styles.noteMeta}>@{note.user.username} · {note.createdAtLabel}</Text>
+                    <Text style={styles.noteMeta}>
+                      @{note.user.username}@{note.user.host} · {note.createdAtLabel}
+                    </Text>
                   </View>
                   <Text style={styles.noteContent}>{note.content}</Text>
 
@@ -650,35 +659,59 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    gap: 10,
+    backgroundColor: '#f3f6ff',
+    gap: 12,
   },
   centerLoadingText: {
-    color: '#475569',
+    color: '#4b5563',
+    fontWeight: '600',
   },
   onboardingScreen: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#eef3ff',
     justifyContent: 'center',
-    padding: 20,
+    padding: 22,
   },
   onboardingCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: 24,
+    padding: 22,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    gap: 12,
+    borderColor: '#dbe5ff',
+    gap: 14,
+    shadowColor: '#1e3a8a',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 4,
+  },
+  onboardingBrand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  onboardingBrandIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2563eb',
+  },
+  onboardingBrandText: {
+    color: '#1e3a8a',
+    fontWeight: '900',
+    fontSize: 18,
   },
   onboardingTitle: {
-    fontSize: 34,
+    fontSize: 28,
     fontWeight: '900',
     color: '#0f172a',
   },
   onboardingSubTitle: {
-    color: '#334155',
+    color: '#475569',
     fontSize: 16,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   inputLabel: {
     color: '#334155',
@@ -686,19 +719,24 @@ const styles = StyleSheet.create({
   },
   onboardingInput: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderColor: '#bfdbfe',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     color: '#0f172a',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f8fbff',
   },
   oauthButton: {
-    backgroundColor: '#1d9bf0',
-    height: 46,
+    backgroundColor: '#2563eb',
+    height: 50,
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#1d4ed8',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.24,
+    shadowRadius: 8,
+    elevation: 3,
   },
   oauthButtonText: {
     color: '#fff',
@@ -711,33 +749,43 @@ const styles = StyleSheet.create({
   },
   onboardingHint: {
     color: '#64748b',
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
   },
   screen: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f6f8ff',
   },
   header: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingBottom: 10,
     paddingTop: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     flex: 1,
   },
   headerAvatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#dbeafe',
+  },
+  headerAppName: {
+    color: '#1d4ed8',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
   },
   headerName: {
     fontWeight: '900',
@@ -749,39 +797,45 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   settingsButton: {
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 18,
-    backgroundColor: '#f1f5f9',
+    borderRadius: 19,
+    backgroundColor: '#eff6ff',
   },
   tabBar: {
     flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginHorizontal: 10,
+    marginTop: 8,
+    backgroundColor: '#eaf1ff',
+    borderRadius: 14,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 10,
     alignItems: 'center',
+    borderRadius: 10,
   },
   tabButtonActive: {
-    borderBottomWidth: 3,
-    borderBottomColor: '#1d9bf0',
+    backgroundColor: '#ffffff',
   },
   tabButtonText: {
-    color: '#64748b',
+    color: '#475569',
     fontWeight: '700',
   },
   tabButtonTextActive: {
-    color: '#0f172a',
+    color: '#1e40af',
   },
   settingsPanel: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#dbeafe',
+    backgroundColor: '#f8fbff',
+    marginHorizontal: 12,
+    marginTop: 8,
+    borderRadius: 14,
     padding: 12,
     gap: 10,
   },
@@ -835,14 +889,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   secondaryButton: {
-    backgroundColor: '#e2e8f0',
-    borderRadius: 10,
+    backgroundColor: '#dbeafe',
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 11,
   },
   secondaryButtonText: {
-    color: '#334155',
+    color: '#1e3a8a',
     fontWeight: '700',
   },
   timelineLoading: {
@@ -856,20 +910,21 @@ const styles = StyleSheet.create({
   },
   timeline: {
     flex: 1,
+    marginTop: 6,
   },
   timelineError: {
     color: '#dc2626',
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingTop: 10,
   },
   emptyStateCard: {
     margin: 14,
-    padding: 14,
-    borderRadius: 12,
+    padding: 16,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#f8fafc',
-    gap: 8,
+    borderColor: '#dbeafe',
+    backgroundColor: '#ffffff',
+    gap: 10,
   },
   emptyStateTitle: {
     color: '#0f172a',
@@ -881,16 +936,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   noteCard: {
+    marginHorizontal: 12,
+    marginBottom: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#dbeafe',
+    backgroundColor: '#ffffff',
   },
   renoteText: {
     color: '#64748b',
     fontSize: 11,
     marginBottom: 6,
-    marginLeft: 46,
+    marginLeft: 0,
   },
   noteRow: {
     flexDirection: 'row',
@@ -926,7 +985,7 @@ const styles = StyleSheet.create({
   },
   noteActions: {
     flexDirection: 'row',
-    gap: 14,
+    gap: 16,
   },
   noteCount: {
     color: '#64748b',
@@ -942,15 +1001,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: '#dbeafe',
     paddingHorizontal: 8,
     paddingVertical: 4,
     gap: 4,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8fbff',
   },
   reactionActive: {
-    borderColor: '#7dd3fc',
-    backgroundColor: '#e0f2fe',
+    borderColor: '#60a5fa',
+    backgroundColor: '#dbeafe',
   },
   reactionText: {
     fontSize: 12,
