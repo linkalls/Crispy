@@ -244,7 +244,7 @@ export default function App() {
     setOauthError(null);
 
     const session = createSessionId();
-    const callbackUrl = Linking.createURL('auth/callback');
+    const callbackUrl = Linking.createURL('auth/callback', { scheme: 'crispy' });
     const permission = [
       'read:account',
       'read:notes',
