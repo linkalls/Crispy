@@ -1,4 +1,8 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
 import { StatusBar } from 'expo-status-bar';
+import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -8,40 +12,18 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+
+WebBrowser.maybeCompleteAuthSession();
 
 type TimelineTab = 'home' | 'local' | 'global';
 
-type ReactionChip = {
-  emoji: string;
-  count: number;
-  reacted: boolean;
-  isCustom?: boolean;
-};
-
-type TimelineNote = {
-  id: string;
-  user: {
-    name: string;
-    username: string;
-    host: string;
-    avatar: string;
-  };
-  content: string;
-  time: string;
-  renote: {
-    user: string;
-  } | null;
-  reactions: ReactionChip[];
-  replies: number;
-  renotes: number;
-};
-
 type MisskeyUser = {
+  id: string;
   name?: string | null;
   username: string;
   host?: string | null;
@@ -61,54 +43,135 @@ type MisskeyNote = {
   renoteCount?: number;
 };
 
+type TimelineNote = {
+  id: string;
+  content: string;
+  createdAtLabel: string;
+  user: {
+    name: string;
+    username: string;
+    host: string;
+    avatar: string;
+  };
+  renoteUser: string | null;
+  reactions: Array<{ emoji: string; count: number; reacted: boolean; isCustom: boolean }>;
+  replies: number;
+  renotes: number;
+};
+
+type StoredAccount = {
+  id: string;
+  host: string;
+  token: string;
+  userId: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string;
+};
+
+type PersistedState = {
+  accounts: StoredAccount[];
+  activeAccountId: string | null;
+  devMode: boolean;
+};
+
+type MisskeyMiAuthCheck = {
+  ok: boolean;
+  token: string;
+  user: MisskeyUser;
+};
+
+type DebugState = {
+  lastPath: string;
+  lastStatus: number | null;
+  lastError: string | null;
+};
+
+const STORAGE_KEY = 'crispy:state:v2';
 const DEFAULT_HOST = 'misskey.io';
+const DEFAULT_AVATAR =
+  'https://api.dicebear.com/9.x/avataaars/svg?seed=Crispy&backgroundColor=b6e3f4';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TimelineTab>('local');
+  const [hydrated, setHydrated] = useState(false);
+  const [accounts, setAccounts] = useState<StoredAccount[]>([]);
+  const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
+  const [devMode, setDevMode] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   const [serverHostInput, setServerHostInput] = useState(DEFAULT_HOST);
-  const [apiTokenInput, setApiTokenInput] = useState('');
-  const [host, setHost] = useState(DEFAULT_HOST);
-  const [apiToken, setApiToken] = useState('');
+  const [oauthLoading, setOauthLoading] = useState(false);
+  const [oauthError, setOauthError] = useState<string | null>(null);
+
+  const [activeTab, setActiveTab] = useState<TimelineTab>('home');
   const [notes, setNotes] = useState<TimelineNote[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingTimeline, setLoadingTimeline] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [timelineError, setTimelineError] = useState<string | null>(null);
+  const [debug, setDebug] = useState<DebugState>({
+    lastPath: '',
+    lastStatus: null,
+    lastError: null,
+  });
 
-  const normalizedHost = useMemo(() => normalizeHost(host), [host]);
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw) as PersistedState;
+        if (Array.isArray(parsed.accounts)) setAccounts(parsed.accounts);
+        setActiveAccountId(parsed.activeAccountId ?? null);
+        setDevMode(Boolean(parsed.devMode));
+      } catch {
+        // noop
+      } finally {
+        setHydrated(true);
+      }
+    };
 
-  const tabStyles = useMemo(
-    () => ({
-      home: activeTab === 'home' ? styles.tabButtonActiveHome : null,
-      local: activeTab === 'local' ? styles.tabButtonActiveLocal : null,
-      global: activeTab === 'global' ? styles.tabButtonActiveGlobal : null,
-    }),
-    [activeTab]
+    load();
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const state: PersistedState = {
+      accounts,
+      activeAccountId,
+      devMode,
+    };
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => undefined);
+  }, [accounts, activeAccountId, devMode, hydrated]);
+
+  const activeAccount = useMemo(
+    () => accounts.find((account) => account.id === activeAccountId) ?? null,
+    [accounts, activeAccountId]
   );
 
   const misskeyRequest = useCallback(
-    async <T,>(
-      path: string,
-      payload: Record<string, unknown>,
-      requiresAuth = false
-    ): Promise<T> => {
-      const baseUrl = `https://${normalizedHost}`;
-      const body: Record<string, unknown> = { ...payload };
-
-      if (apiToken) {
-        body.i = apiToken;
+    async <T,>(path: string, payload: Record<string, unknown>, requiresAuth = false): Promise<T> => {
+      if (!activeAccount) {
+        throw new Error('先にログインしてください。');
       }
 
-      if (requiresAuth && !apiToken) {
-        throw new Error('HOME タイムラインには API トークンが必要です。');
+      if (requiresAuth && !activeAccount.token) {
+        throw new Error('認証が必要です。');
       }
 
-      const response = await fetch(`${baseUrl}${path}`, {
+      const response = await fetch(`https://${activeAccount.host}${path}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...payload, i: activeAccount.token }),
       });
+
+      setDebug((current) => ({
+        ...current,
+        lastPath: path,
+        lastStatus: response.status,
+        lastError: null,
+      }));
 
       if (!response.ok) {
         throw new Error(`Misskey API error: ${response.status}`);
@@ -116,725 +179,752 @@ export default function App() {
 
       return (await response.json()) as T;
     },
-    [apiToken, normalizedHost]
+    [activeAccount]
   );
 
   const loadTimeline = useCallback(
-    async (tab: TimelineTab, useRefreshing = false) => {
-      if (useRefreshing) {
+    async (isRefresh = false) => {
+      if (!activeAccount) return;
+
+      if (isRefresh) {
         setRefreshing(true);
       } else {
-        setLoading(true);
+        setLoadingTimeline(true);
       }
-      setError(null);
+      setTimelineError(null);
+
+      const endpointMap: Record<TimelineTab, string> = {
+        home: '/api/notes/timeline',
+        local: '/api/notes/local-timeline',
+        global: '/api/notes/global-timeline',
+      };
 
       try {
-        const endpointMap: Record<TimelineTab, string> = {
-          home: '/api/notes/timeline',
-          local: '/api/notes/local-timeline',
-          global: '/api/notes/global-timeline',
-        };
+        const data = await misskeyRequest<MisskeyNote[]>(endpointMap[activeTab], {
+          limit: 25,
+          allowPartial: false,
+          withFiles: true,
+          withReplies: true,
+          withRenotes: true,
+        }, true);
 
-        const data = await misskeyRequest<MisskeyNote[]>(
-          endpointMap[tab],
-          {
-            limit: 20,
-            allowPartial: false,
-            withFiles: false,
-            withReplies: true,
-            withRenotes: true,
-          },
-          tab === 'home'
-        );
-
-        setNotes(data.map((note) => mapMisskeyNote(note, normalizedHost)));
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to load timeline.';
-        setError(message);
+        setNotes(data.map((note) => mapNote(note, activeAccount.host)));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'タイムラインを取得できませんでした。';
+        setTimelineError(message);
+        setDebug((current) => ({
+          ...current,
+          lastError: message,
+        }));
       } finally {
-        setLoading(false);
+        setLoadingTimeline(false);
         setRefreshing(false);
       }
     },
-    [misskeyRequest, normalizedHost]
+    [activeAccount, activeTab, misskeyRequest]
   );
 
-  const handleConnect = () => {
-    const cleanedHost = normalizeHost(serverHostInput);
-    if (!cleanedHost) {
-      setError('Misskey サーバーのホスト名を入力してください。');
+  useEffect(() => {
+    if (!activeAccount) {
+      setNotes([]);
       return;
     }
-    setHost(cleanedHost);
-    setApiToken(apiTokenInput.trim());
+    loadTimeline(false);
+  }, [activeAccount, activeTab, loadTimeline]);
+
+  const startMiAuthLogin = async () => {
+    const host = normalizeHost(serverHostInput);
+    if (!host) {
+      setOauthError('サーバーのホスト名を入力してください。');
+      return;
+    }
+
+    setOauthLoading(true);
+    setOauthError(null);
+
+    const session = createSessionId();
+    const callbackUrl = Linking.createURL('auth/callback');
+    const permission = [
+      'read:account',
+      'read:notes',
+      'write:notes',
+      'write:reactions',
+      'write:notifications',
+    ].join(',');
+
+    const authUrl = `https://${host}/miauth/${session}?name=${encodeURIComponent(
+      'Crispy'
+    )}&callback=${encodeURIComponent(callbackUrl)}&permission=${encodeURIComponent(permission)}`;
+
+    try {
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, callbackUrl);
+
+      if (result.type !== 'success') {
+        throw new Error('ログインがキャンセルされました。');
+      }
+
+      const parsed = Linking.parse(result.url);
+      const callbackSession =
+        typeof parsed.queryParams?.session === 'string' ? parsed.queryParams.session : undefined;
+
+      if (callbackSession && callbackSession !== session) {
+        throw new Error('OAuth セッション検証に失敗しました。');
+      }
+
+      const checkResponse = await fetch(`https://${host}/api/miauth/${session}/check`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+
+      if (!checkResponse.ok) {
+        throw new Error(`セッション確認失敗: ${checkResponse.status}`);
+      }
+
+      const auth = (await checkResponse.json()) as MisskeyMiAuthCheck;
+      if (!auth.ok || !auth.token || !auth.user?.id) {
+        throw new Error('ログイン情報が不正です。');
+      }
+
+      const newAccount: StoredAccount = {
+        id: `${host}:${auth.user.id}`,
+        host,
+        token: auth.token,
+        userId: auth.user.id,
+        username: auth.user.username,
+        displayName: auth.user.name || auth.user.username,
+        avatarUrl: auth.user.avatarUrl || DEFAULT_AVATAR,
+      };
+
+      setAccounts((current) => {
+        const withoutCurrent = current.filter((account) => account.id !== newAccount.id);
+        return [newAccount, ...withoutCurrent];
+      });
+      setActiveAccountId(newAccount.id);
+      setServerHostInput(host);
+      setActiveTab('home');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'ログインに失敗しました。';
+      setOauthError(message);
+    } finally {
+      setOauthLoading(false);
+    }
   };
 
-  useEffect(() => {
-    loadTimeline(activeTab);
-  }, [host, apiToken, activeTab, loadTimeline]);
-
-  const handleReactionClick = async (noteId: string, reactionIndex: number) => {
-    if (!apiToken) {
-      Alert.alert('API トークンが必要です', 'リアクション操作には Misskey API トークンが必要です。');
-      return;
-    }
-
+  const handleReactionToggle = async (noteId: string, reactionIndex: number) => {
     const note = notes.find((item) => item.id === noteId);
-    if (!note) return;
+    if (!note || !activeAccount) return;
 
-    const reaction = note.reactions[reactionIndex];
-    if (!reaction) return;
+    const target = note.reactions[reactionIndex];
+    if (!target) return;
 
-    const nextReacted = !reaction.reacted;
+    const nextReacted = !target.reacted;
 
-    setNotes((currentNotes) =>
-      currentNotes.map((item) => {
+    setNotes((current) =>
+      current.map((item) => {
         if (item.id !== noteId) return item;
-        const updated = [...item.reactions];
-        const target = updated[reactionIndex];
-        if (!target) return item;
-        updated[reactionIndex] = {
-          ...target,
+        const reactions = [...item.reactions];
+        const reaction = reactions[reactionIndex];
+        if (!reaction) return item;
+        reactions[reactionIndex] = {
+          ...reaction,
           reacted: nextReacted,
-          count: Math.max(0, target.count + (nextReacted ? 1 : -1)),
+          count: Math.max(0, reaction.count + (nextReacted ? 1 : -1)),
         };
-        return { ...item, reactions: updated };
+        return { ...item, reactions };
       })
     );
 
     try {
-      if (nextReacted) {
-        await misskeyRequest('/api/notes/reactions/create', {
+      await misskeyRequest(
+        nextReacted ? '/api/notes/reactions/create' : '/api/notes/reactions/delete',
+        {
           noteId,
-          reaction: reaction.emoji,
-        }, true);
-      } else {
-        await misskeyRequest('/api/notes/reactions/delete', {
-          noteId,
-          reaction: reaction.emoji,
-        }, true);
-      }
-    } catch (err) {
-      setNotes((currentNotes) =>
-        currentNotes.map((item) => {
+          reaction: target.emoji,
+        },
+        true
+      );
+    } catch (error) {
+      setNotes((current) =>
+        current.map((item) => {
           if (item.id !== noteId) return item;
-          const updated = [...item.reactions];
-          const target = updated[reactionIndex];
-          if (!target) return item;
-          updated[reactionIndex] = {
-            ...target,
-            reacted: reaction.reacted,
-            count: reaction.count,
+          const reactions = [...item.reactions];
+          const reaction = reactions[reactionIndex];
+          if (!reaction) return item;
+          reactions[reactionIndex] = {
+            ...reaction,
+            reacted: target.reacted,
+            count: target.count,
           };
-          return { ...item, reactions: updated };
+          return { ...item, reactions };
         })
       );
-      const message = err instanceof Error ? err.message : 'Reaction update failed.';
-      Alert.alert('リアクション更新に失敗', message);
+      Alert.alert('失敗', error instanceof Error ? error.message : 'リアクション更新に失敗しました。');
     }
   };
 
+  const removeAccount = (accountId: string) => {
+    setAccounts((current) => current.filter((account) => account.id !== accountId));
+    setActiveAccountId((currentActive) => {
+      if (currentActive !== accountId) return currentActive;
+      const next = accounts.find((account) => account.id !== accountId);
+      return next?.id ?? null;
+    });
+  };
+
+  const logoutCurrent = () => {
+    if (!activeAccount) return;
+    Alert.alert('ログアウト', `${activeAccount.displayName} を削除しますか？`, [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '削除',
+        style: 'destructive',
+        onPress: () => removeAccount(activeAccount.id),
+      },
+    ]);
+  };
+
+  if (!hydrated) {
+    return (
+      <View style={styles.centerLoading}>
+        <ActivityIndicator size="large" color="#1d9bf0" />
+        <Text style={styles.centerLoadingText}>Starting Crispy...</Text>
+      </View>
+    );
+  }
+
+  if (!activeAccount) {
+    return (
+      <View style={styles.onboardingScreen}>
+        <StatusBar style="dark" />
+        <View style={styles.onboardingCard}>
+          <Text style={styles.onboardingTitle}>Crispy</Text>
+          <Text style={styles.onboardingSubTitle}>Misskey にログインしてはじめる</Text>
+
+          <Text style={styles.inputLabel}>サーバー</Text>
+          <TextInput
+            value={serverHostInput}
+            onChangeText={setServerHostInput}
+            style={styles.onboardingInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="misskey.io"
+            placeholderTextColor="#6b7280"
+          />
+
+          <Pressable style={styles.oauthButton} onPress={startMiAuthLogin} disabled={oauthLoading}>
+            {oauthLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.oauthButtonText}>Misskeyでログイン</Text>
+            )}
+          </Pressable>
+
+          {oauthError ? <Text style={styles.oauthErrorText}>{oauthError}</Text> : null}
+          <Text style={styles.onboardingHint}>
+            初回起動時にサーバーを入力し、OAuth(MiAuth) でログインします。
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.screen}>
-      <StatusBar style="light" />
-      <View style={styles.phoneFrame}>
-        <View style={styles.header}>
-          <View style={styles.headerTop}>
-            <View style={styles.avatarGlowWrap}>
-              <View style={styles.avatarGlow} />
-              <Image source={{ uri: meAvatar }} style={styles.myAvatar} resizeMode="cover" />
-            </View>
+      <StatusBar style="dark" />
 
-            <Text style={styles.logoText}>Crispy</Text>
-
-            <Pressable style={styles.menuButton}>
-              <Ionicons name="menu" size={20} color="#cbd5e1" />
-            </Pressable>
-          </View>
-
-          <View style={styles.connectionPanel}>
-            <TextInput
-              value={serverHostInput}
-              onChangeText={setServerHostInput}
-              autoCapitalize="none"
-              autoCorrect={false}
-              placeholder="misskey.io"
-              placeholderTextColor="#64748b"
-              style={styles.input}
-            />
-            <TextInput
-              value={apiTokenInput}
-              onChangeText={setApiTokenInput}
-              autoCapitalize="none"
-              autoCorrect={false}
-              secureTextEntry
-              placeholder="API token (optional for local/global)"
-              placeholderTextColor="#64748b"
-              style={styles.input}
-            />
-            <Pressable onPress={handleConnect} style={styles.connectButton}>
-              <Text style={styles.connectButtonText}>Connect</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.tabCapsule}>
-            <Pressable onPress={() => setActiveTab('home')} style={[styles.tabButton, tabStyles.home]}>
-              <Ionicons
-                name="home-outline"
-                size={14}
-                color={activeTab === 'home' ? '#A3E635' : '#64748b'}
-              />
-              <Text style={[styles.tabLabel, activeTab === 'home' && styles.tabLabelActiveHome]}>HOME</Text>
-            </Pressable>
-            <Pressable onPress={() => setActiveTab('local')} style={[styles.tabButton, tabStyles.local]}>
-              <Ionicons
-                name="flash-outline"
-                size={14}
-                color={activeTab === 'local' ? '#FACC15' : '#64748b'}
-              />
-              <Text style={[styles.tabLabel, activeTab === 'local' && styles.tabLabelActiveLocal]}>LOCAL</Text>
-            </Pressable>
-            <Pressable onPress={() => setActiveTab('global')} style={[styles.tabButton, tabStyles.global]}>
-              <Ionicons
-                name="earth-outline"
-                size={14}
-                color={activeTab === 'global' ? '#22D3EE' : '#64748b'}
-              />
-              <Text style={[styles.tabLabel, activeTab === 'global' && styles.tabLabelActiveGlobal]}>
-                GLOBAL
-              </Text>
-            </Pressable>
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Image source={{ uri: activeAccount.avatarUrl }} style={styles.headerAvatar} />
+          <View>
+            <Text style={styles.headerName}>{activeAccount.displayName}</Text>
+            <Text style={styles.headerMeta}>@{activeAccount.username} · {activeAccount.host}</Text>
           </View>
         </View>
 
-        {loading ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator size="large" color="#A3E635" />
-            <Text style={styles.loadingText}>Loading {activeTab} timeline...</Text>
+        <Pressable style={styles.settingsButton} onPress={() => setSettingsOpen((current) => !current)}>
+          <Ionicons name="settings-outline" size={20} color="#334155" />
+        </Pressable>
+      </View>
+
+      <View style={styles.tabBar}>
+        <TabButton label="For You" active={activeTab === 'home'} onPress={() => setActiveTab('home')} />
+        <TabButton label="Local" active={activeTab === 'local'} onPress={() => setActiveTab('local')} />
+        <TabButton label="Global" active={activeTab === 'global'} onPress={() => setActiveTab('global')} />
+      </View>
+
+      {settingsOpen ? (
+        <View style={styles.settingsPanel}>
+          <Text style={styles.settingsTitle}>設定</Text>
+
+          <View style={styles.devModeRow}>
+            <Text style={styles.devModeLabel}>devモード</Text>
+            <Switch value={devMode} onValueChange={setDevMode} />
           </View>
-        ) : (
-          <ScrollView
-            style={styles.timeline}
-            contentContainerStyle={styles.timelineContent}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={() => loadTimeline(activeTab, true)}
-                tintColor="#A3E635"
-              />
-            }
-          >
-            {error ? (
-              <View style={styles.errorCard}>
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            ) : null}
 
-            {notes.map((note) => (
-              <View key={note.id} style={styles.noteCard}>
-                {note.renote && (
-                  <View style={styles.renoteLabel}>
-                    <Ionicons name="repeat" size={12} color="#34d399" />
-                    <Text style={styles.renoteText}>{note.renote.user} がリノート</Text>
+          <Text style={styles.accountSectionTitle}>アカウント切り替え</Text>
+          {accounts.map((account) => (
+            <View key={account.id} style={styles.accountRow}>
+              <Pressable style={styles.accountMain} onPress={() => setActiveAccountId(account.id)}>
+                <Image source={{ uri: account.avatarUrl }} style={styles.accountAvatar} />
+                <View>
+                  <Text style={styles.accountName}>{account.displayName}</Text>
+                  <Text style={styles.accountHost}>@{account.username} · {account.host}</Text>
+                </View>
+              </Pressable>
+              <Pressable onPress={() => removeAccount(account.id)} style={styles.removeAccountButton}>
+                <Ionicons name="trash-outline" size={16} color="#ef4444" />
+              </Pressable>
+            </View>
+          ))}
+
+          <Pressable style={styles.secondaryButton} onPress={logoutCurrent}>
+            <Text style={styles.secondaryButtonText}>現在アカウントを削除</Text>
+          </Pressable>
+          <Pressable style={styles.secondaryButton} onPress={startMiAuthLogin}>
+            <Text style={styles.secondaryButtonText}>別アカウントを追加</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {loadingTimeline ? (
+        <View style={styles.timelineLoading}>
+          <ActivityIndicator size="large" color="#1d9bf0" />
+          <Text style={styles.timelineLoadingText}>タイムラインを読み込み中...</Text>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.timeline}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadTimeline(true)} />}
+          showsVerticalScrollIndicator={false}
+        >
+          {timelineError ? <Text style={styles.timelineError}>{timelineError}</Text> : null}
+
+          {notes.map((note) => (
+            <View key={note.id} style={styles.noteCard}>
+              {note.renoteUser ? <Text style={styles.renoteText}>{note.renoteUser} がリノート</Text> : null}
+              <View style={styles.noteRow}>
+                <Image source={{ uri: note.user.avatar }} style={styles.noteAvatar} />
+                <View style={styles.noteMain}>
+                  <View style={styles.noteHeaderRow}>
+                    <Text style={styles.noteName}>{note.user.name}</Text>
+                    <Text style={styles.noteMeta}>@{note.user.username} · {note.createdAtLabel}</Text>
                   </View>
-                )}
+                  <Text style={styles.noteContent}>{note.content}</Text>
 
-                <View style={styles.noteRow}>
-                  <Image source={{ uri: note.user.avatar }} style={styles.noteAvatar} />
+                  <View style={styles.noteActions}>
+                    <Text style={styles.noteCount}>💬 {note.replies}</Text>
+                    <Text style={styles.noteCount}>🔁 {note.renotes}</Text>
+                  </View>
 
-                  <View style={styles.noteMain}>
-                    <View style={styles.noteHead}>
-                      <Text style={styles.noteName} numberOfLines={1}>
-                        {note.user.name}
-                      </Text>
-                      <Text style={styles.noteUsername} numberOfLines={1}>
-                        {note.user.username}
-                      </Text>
-                      <Text style={styles.hostChip}>@{note.user.host}</Text>
-                    </View>
-
-                    <Text style={styles.noteContent}>{note.content}</Text>
-
-                    <View style={styles.reactionDeck}>
-                      {note.reactions.map((reaction, index) => (
-                        <Pressable
-                          key={`${note.id}-${reaction.emoji}-${index}`}
-                          onPress={() => handleReactionClick(note.id, index)}
-                          style={[styles.reactionButton, reaction.reacted && styles.reactionButtonActive]}
-                        >
-                          <Text style={reaction.isCustom ? styles.reactionEmojiCustom : styles.reactionEmoji}>
-                            {reaction.emoji}
-                          </Text>
-                          <Text style={styles.reactionCount}>{reaction.count}</Text>
-                        </Pressable>
-                      ))}
-                    </View>
-
-                    <View style={styles.actionRow}>
-                      <View style={styles.actionButton}>
-                        <Ionicons name="chatbubble-outline" size={16} color="#94a3b8" />
-                        <Text style={styles.actionText}>{note.replies > 0 ? note.replies : ''}</Text>
-                      </View>
-                      <View style={styles.actionButton}>
-                        <Ionicons name="repeat" size={16} color="#94a3b8" />
-                        <Text style={styles.actionText}>{note.renotes > 0 ? note.renotes : ''}</Text>
-                      </View>
-                      <View style={styles.actionButton}>
-                        <Ionicons name="heart-outline" size={16} color="#94a3b8" />
-                      </View>
-                      <View style={styles.actionButtonRight}>
-                        <Ionicons name="ellipsis-horizontal" size={16} color="#94a3b8" />
-                      </View>
-                    </View>
-
-                    <Text style={styles.timeLabel}>{note.time}</Text>
+                  <View style={styles.reactionWrap}>
+                    {note.reactions.slice(0, 6).map((reaction, index) => (
+                      <Pressable
+                        key={`${note.id}-${reaction.emoji}-${index}`}
+                        style={[styles.reactionButton, reaction.reacted && styles.reactionActive]}
+                        onPress={() => handleReactionToggle(note.id, index)}
+                      >
+                        <Text style={styles.reactionText}>{reaction.emoji}</Text>
+                        <Text style={styles.reactionCount}>{reaction.count}</Text>
+                      </Pressable>
+                    ))}
                   </View>
                 </View>
               </View>
-            ))}
-            <View style={styles.bottomSpacer} />
-          </ScrollView>
-        )}
+            </View>
+          ))}
+        </ScrollView>
+      )}
 
-        <Pressable style={styles.fab}>
-          <Ionicons name="add" size={28} color="#0f172a" />
-        </Pressable>
-
-        <View style={styles.bottomNavWrap}>
-          <View style={styles.bottomNav}>
-            <Pressable style={styles.bottomNavItemActive}>
-              <View style={styles.bottomNavHomeBubble}>
-                <Ionicons name="home" size={20} color="#a3e635" />
-              </View>
-            </Pressable>
-            <Pressable style={styles.bottomNavItem}>
-              <MaterialCommunityIcons name="pound" size={20} color="#94a3b8" />
-            </Pressable>
-            <Pressable style={styles.bottomNavItem}>
-              <View>
-                <Ionicons name="notifications-outline" size={20} color="#94a3b8" />
-                <View style={styles.notifyDot} />
-              </View>
-            </Pressable>
-            <Pressable style={styles.bottomNavItem}>
-              <Image source={{ uri: meAvatar }} style={styles.profileAvatar} />
-            </Pressable>
-          </View>
+      {devMode ? (
+        <View style={styles.devPanel}>
+          <Text style={styles.devTitle}>Dev mode</Text>
+          <Text style={styles.devText}>accountId: {activeAccount.id}</Text>
+          <Text style={styles.devText}>host: {activeAccount.host}</Text>
+          <Text style={styles.devText}>tab: {activeTab}</Text>
+          <Text style={styles.devText}>lastPath: {debug.lastPath || '-'}</Text>
+          <Text style={styles.devText}>lastStatus: {debug.lastStatus ?? '-'}</Text>
+          <Text style={styles.devText}>lastError: {debug.lastError ?? '-'}</Text>
         </View>
-      </View>
+      ) : null}
     </View>
   );
 }
 
-function normalizeHost(rawHost: string): string {
-  return rawHost.replace(/^https?:\/\//i, '').replace(/\/+$/, '').trim();
+function TabButton({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={[styles.tabButton, active && styles.tabButtonActive]} onPress={onPress}>
+      <Text style={[styles.tabButtonText, active && styles.tabButtonTextActive]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function normalizeHost(input: string): string {
+  return input.replace(/^https?:\/\//i, '').replace(/\/+$/, '').trim();
+}
+
+function createSessionId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
 function toRelativeTime(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
-  if (!Number.isFinite(ms)) return '';
   const sec = Math.floor(ms / 1000);
-  if (sec < 60) return `${sec}秒前`;
+  if (!Number.isFinite(sec) || sec < 0) return '';
+  if (sec < 60) return `${sec}s`;
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}分前`;
+  if (min < 60) return `${min}m`;
   const hour = Math.floor(min / 60);
-  if (hour < 24) return `${hour}時間前`;
-  const day = Math.floor(hour / 24);
-  return `${day}日前`;
+  if (hour < 24) return `${hour}h`;
+  return `${Math.floor(hour / 24)}d`;
 }
 
-function mapMisskeyNote(note: MisskeyNote, defaultHost: string): TimelineNote {
-  const display = note.renote && !note.text ? note.renote : note;
-
-  const contentParts = [display.cw, display.text].filter(Boolean) as string[];
-  const reactions = Object.entries(display.reactions ?? {}).map(([emoji, count]) => ({
-    emoji,
-    count,
-    reacted: display.myReaction === emoji,
-    isCustom: emoji.startsWith(':'),
-  }));
+function mapNote(note: MisskeyNote, fallbackHost: string): TimelineNote {
+  const target = note.renote && !note.text ? note.renote : note;
+  const content = [target.cw, target.text].filter(Boolean).join('\n');
 
   return {
     id: note.id,
+    content: content || '(no text)',
+    createdAtLabel: toRelativeTime(target.createdAt),
     user: {
-      name: display.user.name || display.user.username,
-      username: `@${display.user.username}`,
-      host: display.user.host || defaultHost,
-      avatar: display.user.avatarUrl || meAvatar,
+      name: target.user.name || target.user.username,
+      username: target.user.username,
+      host: target.user.host || fallbackHost,
+      avatar: target.user.avatarUrl || DEFAULT_AVATAR,
     },
-    content: contentParts.length > 0 ? contentParts.join('\n') : '(no text)',
-    time: toRelativeTime(display.createdAt),
-    renote: note.renote
-      ? {
-          user: note.user.name || note.user.username,
-        }
-      : null,
-    reactions,
-    replies: display.repliesCount ?? 0,
-    renotes: display.renoteCount ?? 0,
+    renoteUser: note.renote ? note.user.name || note.user.username : null,
+    reactions: Object.entries(target.reactions || {}).map(([emoji, count]) => ({
+      emoji,
+      count,
+      reacted: target.myReaction === emoji,
+      isCustom: emoji.startsWith(':'),
+    })),
+    replies: target.repliesCount ?? 0,
+    renotes: target.renoteCount ?? 0,
   };
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  centerLoading: {
     flex: 1,
-    backgroundColor: '#020617',
-    alignItems: 'center',
     justifyContent: 'center',
-    padding: 14,
-  },
-  phoneFrame: {
-    width: '100%',
-    maxWidth: 420,
-    height: '100%',
-    maxHeight: 900,
-    backgroundColor: '#0f172a',
-    borderRadius: 40,
-    borderWidth: 6,
-    borderColor: '#1e293b',
-    overflow: 'hidden',
-  },
-  header: {
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 16,
-    paddingTop: 18,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
-  },
-  headerTop: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
+    backgroundColor: '#ffffff',
+    gap: 10,
   },
-  avatarGlowWrap: {
-    position: 'relative',
+  centerLoadingText: {
+    color: '#475569',
   },
-  avatarGlow: {
-    position: 'absolute',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#84cc16',
-    opacity: 0.35,
-    transform: [{ scale: 1.15 }],
-  },
-  myAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#0f172a',
-  },
-  logoText: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#A3E635',
-  },
-  menuButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#1e293b',
-    alignItems: 'center',
+  onboardingScreen: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
     justifyContent: 'center',
+    padding: 20,
   },
-  connectionPanel: {
-    gap: 6,
-    marginBottom: 10,
-  },
-  input: {
-    height: 36,
-    borderRadius: 10,
+  onboardingCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 20,
     borderWidth: 1,
-    borderColor: '#334155',
-    backgroundColor: '#0b1324',
-    color: '#e2e8f0',
-    paddingHorizontal: 10,
-    fontSize: 12,
+    borderColor: '#e2e8f0',
+    gap: 12,
   },
-  connectButton: {
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: '#334155',
-    alignItems: 'center',
-    justifyContent: 'center',
+  onboardingTitle: {
+    fontSize: 34,
+    fontWeight: '900',
+    color: '#0f172a',
   },
-  connectButtonText: {
-    color: '#cbd5e1',
-    fontSize: 12,
+  onboardingSubTitle: {
+    color: '#334155',
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  inputLabel: {
+    color: '#334155',
     fontWeight: '700',
   },
-  tabCapsule: {
+  onboardingInput: {
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#0f172a',
+    backgroundColor: '#f8fafc',
+  },
+  oauthButton: {
+    backgroundColor: '#1d9bf0',
+    height: 46,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  oauthButtonText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  oauthErrorText: {
+    color: '#dc2626',
+    fontSize: 12,
+  },
+  onboardingHint: {
+    color: '#64748b',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  screen: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  header: {
+    paddingTop: 54,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
     flexDirection: 'row',
-    backgroundColor: '#020617',
-    borderRadius: 14,
-    padding: 4,
-    gap: 4,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  headerAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+  },
+  headerName: {
+    fontWeight: '900',
+    fontSize: 16,
+    color: '#0f172a',
+  },
+  headerMeta: {
+    color: '#64748b',
+    fontSize: 12,
+  },
+  settingsButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
+    backgroundColor: '#f1f5f9',
+  },
+  tabBar: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+    paddingHorizontal: 8,
   },
   tabButton: {
     flex: 1,
-    height: 32,
-    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  tabButtonActive: {
+    borderBottomWidth: 3,
+    borderBottomColor: '#1d9bf0',
+  },
+  tabButtonText: {
+    color: '#64748b',
+    fontWeight: '700',
+  },
+  tabButtonTextActive: {
+    color: '#0f172a',
+  },
+  settingsPanel: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+    padding: 12,
+    gap: 10,
+  },
+  settingsTitle: {
+    fontWeight: '900',
+    fontSize: 16,
+    color: '#0f172a',
+  },
+  devModeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  devModeLabel: {
+    color: '#1e293b',
+    fontWeight: '700',
+  },
+  accountSectionTitle: {
+    color: '#334155',
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  accountRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
+    justifyContent: 'space-between',
   },
-  tabButtonActiveHome: {
-    backgroundColor: '#1e293b',
+  accountMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
   },
-  tabButtonActiveLocal: {
-    backgroundColor: '#1e293b',
+  accountAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
   },
-  tabButtonActiveGlobal: {
-    backgroundColor: '#1e293b',
+  accountName: {
+    color: '#0f172a',
+    fontWeight: '700',
   },
-  tabLabel: {
-    fontSize: 11,
-    fontWeight: '800',
+  accountHost: {
     color: '#64748b',
+    fontSize: 12,
   },
-  tabLabelActiveHome: {
-    color: '#A3E635',
+  removeAccountButton: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  tabLabelActiveLocal: {
-    color: '#FACC15',
+  secondaryButton: {
+    backgroundColor: '#e2e8f0',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
   },
-  tabLabelActiveGlobal: {
-    color: '#22D3EE',
+  secondaryButtonText: {
+    color: '#334155',
+    fontWeight: '700',
   },
-  loadingWrap: {
+  timelineLoading: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 10,
   },
-  loadingText: {
-    color: '#94a3b8',
-    fontSize: 12,
+  timelineLoadingText: {
+    color: '#64748b',
   },
   timeline: {
     flex: 1,
   },
-  timelineContent: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    gap: 12,
-  },
-  errorCard: {
-    backgroundColor: '#7f1d1d66',
-    borderColor: '#ef444444',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  errorText: {
-    color: '#fecaca',
-    fontSize: 12,
+  timelineError: {
+    color: '#dc2626',
+    paddingHorizontal: 14,
+    paddingTop: 10,
   },
   noteCard: {
-    backgroundColor: '#1e293b88',
-    borderWidth: 1,
-    borderColor: '#334155aa',
-    borderRadius: 24,
-    padding: 14,
-  },
-  renoteLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 10,
-    paddingLeft: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
   renoteText: {
-    color: '#34d399',
+    color: '#64748b',
     fontSize: 11,
-    fontWeight: '700',
+    marginBottom: 6,
+    marginLeft: 46,
   },
   noteRow: {
     flexDirection: 'row',
     gap: 10,
   },
   noteAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: '#334155',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
   noteMain: {
     flex: 1,
+    gap: 6,
   },
-  noteHead: {
+  noteHeaderRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    marginBottom: 8,
     gap: 6,
   },
   noteName: {
-    color: '#f8fafc',
-    fontSize: 14,
+    color: '#0f172a',
     fontWeight: '800',
-    maxWidth: 90,
   },
-  noteUsername: {
-    color: '#94a3b8',
-    fontSize: 11,
-    maxWidth: 72,
-  },
-  hostChip: {
-    color: '#cbd5e1',
-    backgroundColor: '#334155',
-    fontSize: 9,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+  noteMeta: {
+    color: '#64748b',
+    fontSize: 12,
   },
   noteContent: {
-    color: '#e2e8f0',
-    fontSize: 13,
-    lineHeight: 19,
-    marginBottom: 12,
+    color: '#0f172a',
+    fontSize: 15,
+    lineHeight: 21,
   },
-  reactionDeck: {
+  noteActions: {
+    flexDirection: 'row',
+    gap: 14,
+  },
+  noteCount: {
+    color: '#64748b',
+    fontSize: 12,
+  },
+  reactionWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    backgroundColor: '#02061788',
-    borderWidth: 1,
-    borderColor: '#1e293b',
-    borderRadius: 16,
-    padding: 6,
-    marginBottom: 10,
   },
   reactionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    backgroundColor: '#33415588',
-    borderRadius: 10,
+    gap: 4,
+    backgroundColor: '#fff',
   },
-  reactionButtonActive: {
-    backgroundColor: '#84cc1633',
-    borderWidth: 1,
-    borderColor: '#84cc1650',
+  reactionActive: {
+    borderColor: '#7dd3fc',
+    backgroundColor: '#e0f2fe',
   },
-  reactionEmoji: {
-    fontSize: 13,
-  },
-  reactionEmojiCustom: {
-    fontSize: 10,
-    color: '#e2e8f0',
-    backgroundColor: '#1e293b',
-    paddingHorizontal: 4,
-    borderRadius: 4,
-    overflow: 'hidden',
+  reactionText: {
+    fontSize: 12,
   },
   reactionCount: {
-    fontSize: 10,
-    color: '#cbd5e1',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginRight: 22,
-  },
-  actionButtonRight: {
-    marginLeft: 'auto',
-  },
-  actionText: {
-    color: '#94a3b8',
+    color: '#334155',
     fontSize: 11,
   },
-  timeLabel: {
-    marginTop: 8,
-    color: '#64748b',
-    fontSize: 10,
+  devPanel: {
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    backgroundColor: '#0f172a',
+    padding: 10,
+    gap: 2,
   },
-  bottomSpacer: {
-    height: 8,
+  devTitle: {
+    color: '#f8fafc',
+    fontWeight: '800',
+    marginBottom: 4,
   },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 92,
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    backgroundColor: '#A3E635',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#84cc16',
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-    zIndex: 30,
-  },
-  bottomNavWrap: {
-    position: 'absolute',
-    left: 14,
-    right: 14,
-    bottom: 12,
-    zIndex: 25,
-  },
-  bottomNav: {
-    height: 64,
-    borderRadius: 24,
-    backgroundColor: '#1e293bee',
-    borderWidth: 1,
-    borderColor: '#33415588',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: 8,
-  },
-  bottomNavItem: {
-    width: 56,
-    height: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bottomNavItemActive: {
-    width: 56,
-    height: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bottomNavHomeBubble: {
-    backgroundColor: '#84cc1633',
-    borderRadius: 14,
-    padding: 8,
-  },
-  notifyDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#ec4899',
-    position: 'absolute',
-    right: -2,
-    top: -1,
-    borderWidth: 2,
-    borderColor: '#1e293b',
-  },
-  profileAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#475569',
+  devText: {
+    color: '#cbd5e1',
+    fontSize: 11,
   },
 });
-
-const meAvatar =
-  'https://api.dicebear.com/9.x/avataaars/svg?seed=Poteto&backgroundColor=b6e3f4';

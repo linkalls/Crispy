@@ -24,6 +24,12 @@ bun run web
 
 ## Misskey API 接続
 
-1. アプリ上部で Misskey ホスト（例: `misskey.io`）を入力
-2. API トークンを入力（HOME タイムライン/リアクション操作には必須）
-3. `Connect` を押してタイムラインを読み込み
+1. 初回起動で Misskey ホスト（例: `misskey.io`）を入力
+2. `Misskeyでログイン` を押して OAuth (MiAuth) 認証
+3. 認証後に HOME / LOCAL / GLOBAL タイムラインを利用
+
+## 追加機能
+
+- 初回起動オンボーディング + OAuth ログイン
+- 複数アカウントの追加 / 切り替え / 削除
+- 設定の `devモード` で API 詳細情報を表示
