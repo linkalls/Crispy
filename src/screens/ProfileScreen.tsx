@@ -47,62 +47,12 @@ export function ProfileScreen({
     else setLoading(true);
 
     try {
-      if (activeAccount.token === 'mock_token' || activeAccount.id === 'test-account') {
-        // Mock profile
-        setProfile({
-          id: 'test',
-          name: 'Test User',
-          username: 'testuser',
-          host: null,
-          avatarUrl: activeAccount.avatarUrl,
-          bannerUrl: 'https://picsum.photos/800/300',
-          description: 'Crispyの開発テスト用アカウントです。\nMisskeyクライアントを開発中！🚀',
-          followersCount: 42,
-          followingCount: 128,
-          notesCount: 256,
-          createdAt: '2024-01-15T00:00:00Z',
-        });
-        // Mock notes
-        setNotes([
-          {
-            id: 'my_note_1',
-            targetId: 'my_note_1',
-            content: 'Crispyの開発が順調に進んでいます！画像添付機能も実装しました 🎉',
-            createdAtLabel: '3時間前',
-            user: { name: 'Test User', username: 'testuser', host: 'sushi.ski', avatar: activeAccount.avatarUrl },
-            renoteUser: null,
-            reactions: [{ emoji: '👍', count: 3, reacted: false, isCustom: false }],
-            replies: 1,
-            renotes: 0,
-            files: [],
-            reply: null,
-            quote: null,
-            emojis: {},
-          },
-          {
-            id: 'my_note_2',
-            targetId: 'my_note_2',
-            content: 'ボトムナビゲーションとFABを追加しました。だいぶアプリらしくなってきた！',
-            createdAtLabel: '1日前',
-            user: { name: 'Test User', username: 'testuser', host: 'sushi.ski', avatar: activeAccount.avatarUrl },
-            renoteUser: null,
-            reactions: [{ emoji: '🎉', count: 5, reacted: true, isCustom: false }],
-            replies: 2,
-            renotes: 3,
-            files: [],
-            reply: null,
-            quote: null,
-            emojis: {},
-          },
-        ]);
-      } else {
-        const [userInfo, userNotes] = await Promise.all([
-          misskeyRequest<UserProfile>('/api/users/show', { userId: activeAccount.userId }, true),
-          misskeyRequest<any[]>('/api/users/notes', { userId: activeAccount.userId, limit: 20 }, true),
-        ]);
-        setProfile(userInfo);
-        setNotes(userNotes.map((n) => mapNote(n, activeAccount.host)));
-      }
+      const [userInfo, userNotes] = await Promise.all([
+        misskeyRequest<UserProfile>('/api/users/show', { userId: activeAccount.userId }, true),
+        misskeyRequest<any[]>('/api/users/notes', { userId: activeAccount.userId, limit: 20 }, true),
+      ]);
+      setProfile(userInfo);
+      setNotes(userNotes.map((n) => mapNote(n, activeAccount.host)));
     } catch (e) {
       console.error('Failed to load profile:', e);
     } finally {

@@ -164,9 +164,7 @@ export function MfmRenderer({
       }
       if (node.type === 'fn') {
         return (
-          <MfmFunctionNode key={key} node={node}>
-            {renderNodes(node.children, key)}
-          </MfmFunctionNode>
+          <MfmFunctionNode key={key} node={node} childrenNodes={renderNodes(node.children, key)} />
         );
       }
       if ('children' in node && Array.isArray(node.children)) {

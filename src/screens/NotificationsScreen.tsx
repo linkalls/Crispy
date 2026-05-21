@@ -102,49 +102,8 @@ export function NotificationsScreen({
     else setLoading(true);
 
     try {
-      // Mock data for test account
-      if (activeAccount.token === 'mock_token' || activeAccount.id === 'test-account') {
-        setNotifications([
-          {
-            id: 'notif_1',
-            type: 'reaction',
-            createdAt: new Date(Date.now() - 120000).toISOString(),
-            user: { id: 'u1', name: 'Alice', username: 'alice', avatarUrl: 'https://sushi.ski/identicon/alice', host: null },
-            note: { id: 'n1', text: 'これはUIテスト用のモックノートです！' },
-            reaction: '👍',
-          },
-          {
-            id: 'notif_2',
-            type: 'follow',
-            createdAt: new Date(Date.now() - 3600000).toISOString(),
-            user: { id: 'u2', name: 'Bob', username: 'bob', avatarUrl: 'https://sushi.ski/identicon/bob', host: 'misskey.io' },
-          },
-          {
-            id: 'notif_3',
-            type: 'reply',
-            createdAt: new Date(Date.now() - 7200000).toISOString(),
-            user: { id: 'u3', name: 'Carol', username: 'carol', avatarUrl: 'https://sushi.ski/identicon/carol', host: null },
-            note: { id: 'n2', text: 'いいですね！私もそう思います。' },
-          },
-          {
-            id: 'notif_4',
-            type: 'renote',
-            createdAt: new Date(Date.now() - 86400000).toISOString(),
-            user: { id: 'u4', name: 'Dave', username: 'dave', avatarUrl: 'https://sushi.ski/identicon/dave', host: null },
-            note: { id: 'n3', text: 'Crispy開発中です！' },
-          },
-          {
-            id: 'notif_5',
-            type: 'mention',
-            createdAt: new Date(Date.now() - 172800000).toISOString(),
-            user: { id: 'u5', name: 'Eve', username: 'eve', avatarUrl: 'https://sushi.ski/identicon/eve', host: 'example.com' },
-            note: { id: 'n4', text: '@testuser このアプリすごいですね！' },
-          },
-        ]);
-      } else {
-        const data = await misskeyRequest<MisskeyNotification[]>('/api/i/notifications', { limit: 30 }, true);
-        setNotifications(data);
-      }
+      const data = await misskeyRequest<MisskeyNotification[]>('/api/i/notifications', { limit: 30 }, true);
+      setNotifications(data);
     } catch (e) {
       console.error('Failed to load notifications:', e);
     } finally {
