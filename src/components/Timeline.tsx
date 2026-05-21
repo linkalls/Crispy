@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, FlatList, Text, View } from 'react-native';
 import { styles } from '../styles/styles';
 import { ColorScheme, TimelineNote } from '../utils/types';
 import { Note } from './Note';
@@ -50,55 +50,59 @@ export function Timeline({
   }
 
   return (
-    <ScrollView
+    <FlatList
+      data={notes}
+      keyExtractor={(item) => item.id}
       style={styles.timeline}
       refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
       showsVerticalScrollIndicator={false}
-    >
-      {error ? <Text style={styles.timelineError}>{error}</Text> : null}
-
-      {!error && notes.length === 0 ? (
-        <View style={[styles.emptyStateCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-          <Text style={[styles.emptyStateTitle, { color: colors.text }]}>
-            表示できるノートがありません
-          </Text>
-          <Text style={[styles.emptyStateText, { color: colors.textMuted }]}>
-            少し待ってから再読み込みしてください。
-          </Text>
-          <Pressable
-            style={({ pressed }) => [
-              styles.secondaryButton,
-              { backgroundColor: colors.reactionBg },
-              pressed && styles.buttonPressed,
-            ]}
-            onPress={onRefresh}
-          >
-            <Text style={[styles.secondaryButtonText, { color: colors.primaryText }]}>
-              再読み込み
+      initialNumToRender={10}
+      maxToRenderPerBatch={10}
+      windowSize={5}
+      removeClippedSubviews={true}
+      ListHeaderComponent={
+        error ? <Text style={styles.timelineError}>{error}</Text> : null
+      }
+      ListEmptyComponent={
+        !error ? (
+          <View style={[styles.emptyStateCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+            <Text style={[styles.emptyStateTitle, { color: colors.text }]}>
+              表示できるノートがありません
             </Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      {notes.map((note) => (
+            <Text style={[styles.emptyStateText, { color: colors.textMuted }]}>
+              少し待ってから再読み込みしてください。
+            </Text>
+            <Pressable
+              style={({ pressed }) => [
+                styles.secondaryButton,
+                { backgroundColor: colors.reactionBg },
+                pressed && styles.buttonPressed,
+              ]}
+              onPress={onRefresh}
+            >
+              <Text style={[styles.secondaryButtonText, { color: colors.primaryText }]}>
+                再読み込み
+              </Text>
+            </Pressable>
+          </View>
+        ) : null
+      }
+      renderItem={({ item: note }) => (
         <Note
-          key={note.id}
           note={note}
           isReplying={replyingNoteId === note.id}
           replyText={replyText}
           isSendingReply={isSendingReply}
           colors={colors}
           onPress={() => onNotePress?.(note)}
-          onReplyPress={() => {
-            onReplyPress(note.id);
-          }}
+          onReplyPress={() => onReplyPress(note.id)}
           onReplyTextChange={onReplyTextChange}
           onReplySubmit={onReplySubmit}
           onRenotePress={() => onRenotePress(note)}
           onSharePress={() => onSharePress(note)}
           onReactionPress={(index) => onReactionPress(note.id, index)}
         />
-      ))}
-    </ScrollView>
+      )}
+    />
   );
 }

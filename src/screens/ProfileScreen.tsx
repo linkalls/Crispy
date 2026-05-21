@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { ColorScheme, StoredAccount, TimelineNote } from '../utils/types';
 import { mapNote } from '../utils/formatting';
+import { Note } from '../components/Note';
 
 type UserProfile = {
   id: string;
@@ -31,10 +32,20 @@ export function ProfileScreen({
   colors,
   activeAccount,
   misskeyRequest,
+  onNotePress,
+  onReplyPress,
+  onRenotePress,
+  onSharePress,
+  onReactionPress,
 }: {
   colors: ColorScheme;
   activeAccount: StoredAccount | null;
   misskeyRequest: <T>(path: string, payload: Record<string, unknown>, requiresAuth?: boolean) => Promise<T>;
+  onNotePress?: (note: TimelineNote) => void;
+  onReplyPress?: (noteOrId: string | TimelineNote) => void;
+  onRenotePress?: (note: TimelineNote) => void;
+  onSharePress?: (note: TimelineNote) => void;
+  onReactionPress?: (noteOrId: string | TimelineNote, index: number) => void;
 }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [notes, setNotes] = useState<TimelineNote[]>([]);
@@ -47,7 +58,7 @@ export function ProfileScreen({
     else setLoading(true);
 
     try {
-      if (activeAccount.token === 'mock_token' || activeAccount.id === 'test-account') {
+      if (activeAccount.token === 'mock_token') {
         // Mock profile
         setProfile({
           id: 'test',
@@ -180,36 +191,20 @@ export function ProfileScreen({
   );
 
   const renderNote = ({ item }: { item: TimelineNote }) => (
-    <View style={[localStyles.noteCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-        <Image source={{ uri: item.user.avatar }} style={{ width: 36, height: 36, borderRadius: 18 }} />
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.text, fontWeight: '600', fontSize: 14 }} numberOfLines={1}>{item.user.name}</Text>
-          <Text style={{ color: colors.textMuted, fontSize: 12 }}>@{item.user.username} · {item.createdAtLabel}</Text>
-        </View>
-      </View>
-      <Text style={{ color: colors.text, fontSize: 15, lineHeight: 22 }}>{item.content}</Text>
-      {item.reactions.length > 0 && (
-        <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-          {item.reactions.map((r, i) => (
-            <View key={i} style={[localStyles.reactionChip, { backgroundColor: r.reacted ? colors.reactionActiveBg : colors.reactionBg, borderColor: r.reacted ? colors.reactionActiveBorder : colors.reactionBorder }]}>
-              <Text style={{ fontSize: 14 }}>{r.emoji}</Text>
-              <Text style={{ color: colors.text, fontSize: 12, fontWeight: '500' }}>{r.count}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-      <View style={{ flexDirection: 'row', gap: 20, marginTop: 10 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Ionicons name="chatbubble-outline" size={16} color={colors.textMuted} />
-          {item.replies > 0 && <Text style={{ color: colors.textMuted, fontSize: 13 }}>{item.replies}</Text>}
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Ionicons name="repeat-outline" size={16} color={colors.textMuted} />
-          {item.renotes > 0 && <Text style={{ color: colors.textMuted, fontSize: 13 }}>{item.renotes}</Text>}
-        </View>
-      </View>
-    </View>
+    <Note
+      note={item}
+      isReplying={false}
+      replyText=""
+      isSendingReply={false}
+      colors={colors}
+      onPress={() => onNotePress?.(item)}
+      onReplyPress={() => onReplyPress?.(item)}
+      onReplyTextChange={() => {}}
+      onReplySubmit={() => {}}
+      onRenotePress={() => onRenotePress?.(item)}
+      onSharePress={() => onSharePress?.(item)}
+      onReactionPress={(index) => onReactionPress?.(item, index)}
+    />
   );
 
   return (

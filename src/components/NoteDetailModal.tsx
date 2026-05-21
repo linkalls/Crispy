@@ -39,7 +39,7 @@ export function NoteDetailModal({
   activeAccountHost: string;
   misskeyRequest: <T>(path: string, payload: Record<string, unknown>, requiresAuth?: boolean) => Promise<T>;
   onClose: () => void;
-  onReactionPress: (noteId: string, reactionIndex: number) => Promise<void>;
+  onReactionPress: (noteOrId: string | TimelineNote, reactionIndex: number) => Promise<void>;
   onRenotePress: (note: TimelineNote) => void;
   onSharePress: (note: TimelineNote) => void;
   onReplySubmitSuccess: () => void;
@@ -222,7 +222,7 @@ export function NoteDetailModal({
               {note.reactions && note.reactions.length > 0 ? (
                 <View style={styles.reactionWrap}>
                   {note.reactions.slice(0, 8).map((reaction, index) => {
-                    const reactionEmojiUrl = note.emojis[reaction.emoji] || note.emojis[reaction.emoji.replace(/:/g, "")];
+                    const reactionEmojiUrl = reaction.url;
                     return (
                       <Pressable
                         key={`${note.id}-${reaction.emoji}-${index}`}
@@ -359,7 +359,7 @@ export function NoteDetailModal({
                         {/* Reactions wrap for replies */}
                         <View style={styles.replyItemReactions}>
                           {replyNote.reactions.slice(0, 6).map((reaction, index) => {
-                            const reactionEmojiUrl = replyNote.emojis[reaction.emoji] || replyNote.emojis[reaction.emoji.replace(/:/g, "")];
+                            const reactionEmojiUrl = reaction.url;
                             return (
                               <Pressable
                                 key={`${replyNote.id}-${reaction.emoji}-${index}`}

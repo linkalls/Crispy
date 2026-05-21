@@ -50,6 +50,35 @@ export function mapNote(note: MisskeyNote, fallbackHost: string): TimelineNote {
     }
   });
 
+  if (target.reactionEmojis) {
+    Object.entries(target.reactionEmojis).forEach(([name, url]) => {
+      emojiMap[name] = url;
+      emojiMap[`:${name}:`] = url;
+    });
+  }
+
+  const reactions = Object.entries(target.reactions || {}).map(([emoji, count]) => {
+    let reactionEmojiUrl = emojiMap[emoji] || emojiMap[emoji.replace(/:/g, '')];
+
+    // Fallback for emojis containing '@'
+    if (!reactionEmojiUrl && emoji.startsWith(':') && emoji.endsWith(':')) {
+      const nameWithoutColons = emoji.slice(1, -1);
+      const parts = nameWithoutColons.split('@');
+      if (parts.length === 2) {
+        const baseName = parts[0];
+        reactionEmojiUrl = emojiMap[baseName] || emojiMap[`:${baseName}:`];
+      }
+    }
+
+    return {
+      emoji,
+      count,
+      reacted: target.myReaction === emoji,
+      isCustom: emoji.startsWith(':'),
+      url: reactionEmojiUrl
+    };
+  });
+
   return {
     id: note.id,
     targetId: target.id,
@@ -62,12 +91,7 @@ export function mapNote(note: MisskeyNote, fallbackHost: string): TimelineNote {
       avatar: target.user.avatarUrl || DEFAULT_AVATAR,
     },
     renoteUser: isPureRenote ? note.user.name || note.user.username : null,
-    reactions: Object.entries(target.reactions || {}).map(([emoji, count]) => ({
-      emoji,
-      count,
-      reacted: target.myReaction === emoji,
-      isCustom: emoji.startsWith(":"),
-    })),
+    reactions: reactions,
     replies: target.repliesCount ?? 0,
     renotes: target.renoteCount ?? 0,
     files: (target.files || []).map((f) => ({

@@ -26,6 +26,7 @@ export type MisskeyNote = {
   user: MisskeyUser;
   renote?: MisskeyNote | null;
   reactions?: Record<string, number>;
+  reactionEmojis?: Record<string, string>;
   myReaction?: string | null;
   repliesCount?: number;
   renoteCount?: number;
@@ -52,6 +53,7 @@ export type TimelineNote = {
     count: number;
     reacted: boolean;
     isCustom: boolean;
+    url?: string;
   }>;
   replies: number;
   renotes: number;

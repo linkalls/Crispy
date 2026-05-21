@@ -103,7 +103,8 @@ export function NotificationsScreen({
 
     try {
       // Mock data for test account
-      if (activeAccount.token === 'mock_token' || activeAccount.id === 'test-account') {
+      // Not mocking if we have a real token, but test account is gone. Let's just always request if no mock_token
+      if (activeAccount.token === 'mock_token') {
         setNotifications([
           {
             id: 'notif_1',

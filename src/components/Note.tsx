@@ -158,7 +158,7 @@ export function Note({
           {note.reactions && note.reactions.length > 0 ? (
             <View style={styles.reactionWrap}>
               {note.reactions.slice(0, 8).map((reaction, index) => {
-                const reactionEmojiUrl = note.emojis[reaction.emoji] || note.emojis[reaction.emoji.replace(/:/g, '')];
+                const reactionEmojiUrl = reaction.url;
                 return (
                   <Pressable
                     key={`${note.id}-${reaction.emoji}-${index}`}

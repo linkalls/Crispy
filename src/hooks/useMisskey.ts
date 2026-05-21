@@ -12,7 +12,7 @@ export function useMisskey(activeAccount: StoredAccount | null) {
         throw new Error("先にログインしてください。");
       }
 
-      if (activeAccount.token === 'mock_token' || activeAccount.id === 'test-account') {
+      if (activeAccount.token === 'mock_token') {
         if (path === '/api/notes/children') {
           return [
             {
