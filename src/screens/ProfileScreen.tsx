@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { ColorScheme, StoredAccount, TimelineNote } from '../utils/types';
 import { mapNote } from '../utils/formatting';
+import { Note } from '../components/Note';
 
 type UserProfile = {
   id: string;
@@ -31,10 +32,30 @@ export function ProfileScreen({
   colors,
   activeAccount,
   misskeyRequest,
+  replyingNoteId,
+  replyText,
+  isSendingReply,
+  onNotePress,
+  onReplyPress,
+  onReplyTextChange,
+  onReplySubmit,
+  onRenotePress,
+  onSharePress,
+  onReactionPress,
 }: {
   colors: ColorScheme;
   activeAccount: StoredAccount | null;
   misskeyRequest: <T>(path: string, payload: Record<string, unknown>, requiresAuth?: boolean) => Promise<T>;
+  replyingNoteId?: string | null;
+  replyText?: string;
+  isSendingReply?: boolean;
+  onNotePress?: (note: TimelineNote) => void;
+  onReplyPress?: (noteId: string, username?: string) => void;
+  onReplyTextChange?: (text: string) => void;
+  onReplySubmit?: () => void;
+  onRenotePress?: (note: TimelineNote) => void;
+  onSharePress?: (note: TimelineNote) => void;
+  onReactionPress?: (noteId: string, index: number) => void;
 }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [notes, setNotes] = useState<TimelineNote[]>([]);
@@ -47,62 +68,12 @@ export function ProfileScreen({
     else setLoading(true);
 
     try {
-      if (activeAccount.token === 'mock_token' || activeAccount.id === 'test-account') {
-        // Mock profile
-        setProfile({
-          id: 'test',
-          name: 'Test User',
-          username: 'testuser',
-          host: null,
-          avatarUrl: activeAccount.avatarUrl,
-          bannerUrl: 'https://picsum.photos/800/300',
-          description: 'Crispyの開発テスト用アカウントです。\nMisskeyクライアントを開発中！🚀',
-          followersCount: 42,
-          followingCount: 128,
-          notesCount: 256,
-          createdAt: '2024-01-15T00:00:00Z',
-        });
-        // Mock notes
-        setNotes([
-          {
-            id: 'my_note_1',
-            targetId: 'my_note_1',
-            content: 'Crispyの開発が順調に進んでいます！画像添付機能も実装しました 🎉',
-            createdAtLabel: '3時間前',
-            user: { name: 'Test User', username: 'testuser', host: 'sushi.ski', avatar: activeAccount.avatarUrl },
-            renoteUser: null,
-            reactions: [{ emoji: '👍', count: 3, reacted: false, isCustom: false }],
-            replies: 1,
-            renotes: 0,
-            files: [],
-            reply: null,
-            quote: null,
-            emojis: {},
-          },
-          {
-            id: 'my_note_2',
-            targetId: 'my_note_2',
-            content: 'ボトムナビゲーションとFABを追加しました。だいぶアプリらしくなってきた！',
-            createdAtLabel: '1日前',
-            user: { name: 'Test User', username: 'testuser', host: 'sushi.ski', avatar: activeAccount.avatarUrl },
-            renoteUser: null,
-            reactions: [{ emoji: '🎉', count: 5, reacted: true, isCustom: false }],
-            replies: 2,
-            renotes: 3,
-            files: [],
-            reply: null,
-            quote: null,
-            emojis: {},
-          },
-        ]);
-      } else {
-        const [userInfo, userNotes] = await Promise.all([
-          misskeyRequest<UserProfile>('/api/users/show', { userId: activeAccount.userId }, true),
-          misskeyRequest<any[]>('/api/users/notes', { userId: activeAccount.userId, limit: 20 }, true),
-        ]);
-        setProfile(userInfo);
-        setNotes(userNotes.map((n) => mapNote(n, activeAccount.host)));
-      }
+      const [userInfo, userNotes] = await Promise.all([
+        misskeyRequest<UserProfile>('/api/users/show', { userId: activeAccount.userId }, true),
+        misskeyRequest<any[]>('/api/users/notes', { userId: activeAccount.userId, limit: 20 }, true),
+      ]);
+      setProfile(userInfo);
+      setNotes(userNotes.map((n) => mapNote(n, activeAccount.host)));
     } catch (e) {
       console.error('Failed to load profile:', e);
     } finally {
@@ -110,6 +81,38 @@ export function ProfileScreen({
       setRefreshing(false);
     }
   }, [activeAccount, misskeyRequest]);
+
+  // Handle local state updates for ProfileScreen when acting on notes
+  const handleReplySubmit = async () => {
+    if (!replyingNoteId || !replyText) return;
+    try {
+      await misskeyRequest('/api/notes/create', { text: replyText, replyId: replyingNoteId }, true);
+      onReplyTextChange?.('');
+      onReplyPress?.(replyingNoteId); // This toggles the replying note off in App.tsx
+      loadProfile(true); // reload profile after successful reply
+    } catch (error) {
+      console.error('Failed to reply from profile:', error);
+    }
+  };
+
+  const handleReactionPress = async (noteId: string, index: number) => {
+    const note = notes.find((item) => item.id === noteId);
+    if (!note || !activeAccount) return;
+
+    const target = note.reactions[index];
+    if (!target) return;
+
+    try {
+      if (target.reacted) {
+        await misskeyRequest('/api/notes/reactions/delete', { noteId: note.targetId }, true);
+      } else {
+        await misskeyRequest('/api/notes/reactions/create', { noteId: note.targetId, reaction: target.emoji }, true);
+      }
+      loadProfile(true);
+    } catch (error) {
+      console.error('Failed to react from profile:', error);
+    }
+  };
 
   useEffect(() => {
     loadProfile();
@@ -180,36 +183,20 @@ export function ProfileScreen({
   );
 
   const renderNote = ({ item }: { item: TimelineNote }) => (
-    <View style={[localStyles.noteCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-        <Image source={{ uri: item.user.avatar }} style={{ width: 36, height: 36, borderRadius: 18 }} />
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.text, fontWeight: '600', fontSize: 14 }} numberOfLines={1}>{item.user.name}</Text>
-          <Text style={{ color: colors.textMuted, fontSize: 12 }}>@{item.user.username} · {item.createdAtLabel}</Text>
-        </View>
-      </View>
-      <Text style={{ color: colors.text, fontSize: 15, lineHeight: 22 }}>{item.content}</Text>
-      {item.reactions.length > 0 && (
-        <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-          {item.reactions.map((r, i) => (
-            <View key={i} style={[localStyles.reactionChip, { backgroundColor: r.reacted ? colors.reactionActiveBg : colors.reactionBg, borderColor: r.reacted ? colors.reactionActiveBorder : colors.reactionBorder }]}>
-              <Text style={{ fontSize: 14 }}>{r.emoji}</Text>
-              <Text style={{ color: colors.text, fontSize: 12, fontWeight: '500' }}>{r.count}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-      <View style={{ flexDirection: 'row', gap: 20, marginTop: 10 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Ionicons name="chatbubble-outline" size={16} color={colors.textMuted} />
-          {item.replies > 0 && <Text style={{ color: colors.textMuted, fontSize: 13 }}>{item.replies}</Text>}
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Ionicons name="repeat-outline" size={16} color={colors.textMuted} />
-          {item.renotes > 0 && <Text style={{ color: colors.textMuted, fontSize: 13 }}>{item.renotes}</Text>}
-        </View>
-      </View>
-    </View>
+    <Note
+      note={item}
+      isReplying={replyingNoteId === item.id}
+      replyText={replyText || ''}
+      isSendingReply={isSendingReply || false}
+      colors={colors}
+      onPress={() => onNotePress?.(item)}
+      onReplyPress={() => onReplyPress?.(item.id, item.user.username)}
+      onReplyTextChange={(text) => onReplyTextChange?.(text)}
+      onReplySubmit={() => handleReplySubmit()}
+      onRenotePress={() => onRenotePress?.(item)}
+      onSharePress={() => onSharePress?.(item)}
+      onReactionPress={(index) => handleReactionPress(item.id, index)}
+    />
   );
 
   return (

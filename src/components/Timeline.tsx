@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, FlatList, Text, View } from 'react-native';
 import { styles } from '../styles/styles';
 import { ColorScheme, TimelineNote } from '../utils/types';
 import { Note } from './Note';
@@ -49,14 +49,28 @@ export function Timeline({
     );
   }
 
-  return (
-    <ScrollView
-      style={styles.timeline}
-      refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
-      showsVerticalScrollIndicator={false}
-    >
-      {error ? <Text style={styles.timelineError}>{error}</Text> : null}
+  const renderItem = ({ item: note }: { item: TimelineNote }) => (
+    <Note
+      note={note}
+      isReplying={replyingNoteId === note.id}
+      replyText={replyText}
+      isSendingReply={isSendingReply}
+      colors={colors}
+      onPress={() => onNotePress?.(note)}
+      onReplyPress={() => {
+        onReplyPress(note.id);
+      }}
+      onReplyTextChange={onReplyTextChange}
+      onReplySubmit={onReplySubmit}
+      onRenotePress={() => onRenotePress(note)}
+      onSharePress={() => onSharePress(note)}
+      onReactionPress={(index) => onReactionPress(note.id, index)}
+    />
+  );
 
+  const ListHeaderComponent = () => (
+    <>
+      {error ? <Text style={styles.timelineError}>{error}</Text> : null}
       {!error && notes.length === 0 ? (
         <View style={[styles.emptyStateCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <Text style={[styles.emptyStateTitle, { color: colors.text }]}>
@@ -79,26 +93,18 @@ export function Timeline({
           </Pressable>
         </View>
       ) : null}
+    </>
+  );
 
-      {notes.map((note) => (
-        <Note
-          key={note.id}
-          note={note}
-          isReplying={replyingNoteId === note.id}
-          replyText={replyText}
-          isSendingReply={isSendingReply}
-          colors={colors}
-          onPress={() => onNotePress?.(note)}
-          onReplyPress={() => {
-            onReplyPress(note.id);
-          }}
-          onReplyTextChange={onReplyTextChange}
-          onReplySubmit={onReplySubmit}
-          onRenotePress={() => onRenotePress(note)}
-          onSharePress={() => onSharePress(note)}
-          onReactionPress={(index) => onReactionPress(note.id, index)}
-        />
-      ))}
-    </ScrollView>
+  return (
+    <FlatList
+      style={styles.timeline}
+      data={notes}
+      keyExtractor={(item) => item.id}
+      renderItem={renderItem}
+      ListHeaderComponent={ListHeaderComponent}
+      refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
+      showsVerticalScrollIndicator={false}
+    />
   );
 }

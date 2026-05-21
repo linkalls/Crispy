@@ -34,6 +34,7 @@ import {
   BottomNavigation,
   FAB,
   NoteComposerModal,
+  TabBar,
 } from './src/components';
 import { NotificationsScreen, ExploreScreen, ProfileScreen } from './src/screens';
 import { useMisskey, useMisskeyStream } from './src/hooks';
@@ -73,16 +74,8 @@ export default function App() {
 
 function AppContent() {
   const [hydrated, setHydrated] = useState(false);
-  const [accounts, setAccounts] = useState<StoredAccount[]>([{
-    id: 'test-account',
-    host: 'sushi.ski',
-    token: '',
-    userId: 'test',
-    username: 'testuser',
-    displayName: 'Test User',
-    avatarUrl: DEFAULT_AVATAR
-  }]);
-  const [activeAccountId, setActiveAccountId] = useState<string | null>('test-account');
+  const [accounts, setAccounts] = useState<StoredAccount[]>([]);
+  const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
   const [devMode, setDevMode] = useState(false);
   const [themeMode, setThemeMode] = useState<'system' | 'light' | 'dark'>('system');
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
@@ -589,11 +582,9 @@ function AppContent() {
         </Pressable>
       </View>
 
-      <View style={[styles.tabBar, { backgroundColor: colors.tabBg }]}>
-        <TabButton label="For You" active={activeTab === 'home'} onPress={() => setActiveTab('home')} colors={colors} />
-        <TabButton label="Local" active={activeTab === 'local'} onPress={() => setActiveTab('local')} colors={colors} />
-        <TabButton label="Global" active={activeTab === 'global'} onPress={() => setActiveTab('global')} colors={colors} />
-      </View>
+      {mainTab === 'home' && (
+        <TabBar activeTab={activeTab} onTabChange={setActiveTab} colors={colors} />
+      )}
 
       <Modal
         visible={accountMenuOpen}
@@ -758,7 +749,33 @@ function AppContent() {
       )}
       {mainTab === 'explore' && <ExploreScreen colors={colors} />}
       {mainTab === 'notifications' && <NotificationsScreen colors={colors} activeAccount={activeAccount} misskeyRequest={misskeyRequest} />}
-      {mainTab === 'profile' && <ProfileScreen colors={colors} activeAccount={activeAccount} misskeyRequest={misskeyRequest} />}
+      {mainTab === 'profile' && (
+        <ProfileScreen
+          colors={colors}
+          activeAccount={activeAccount}
+          misskeyRequest={misskeyRequest}
+          replyingNoteId={replyingNoteId}
+          replyText={replyText}
+          isSendingReply={sendingReply}
+          onNotePress={(note) => {
+            setSelectedNoteForDetail(note);
+            setIsDetailModalVisible(true);
+          }}
+          onReplyPress={(noteId, username) => {
+            if (replyingNoteId === noteId) {
+              setReplyingNoteId(null);
+              setReplyText('');
+            } else {
+              setReplyingNoteId(noteId);
+              setReplyText(username ? `@${username} ` : '');
+            }
+          }}
+          onReplyTextChange={setReplyText}
+          // ProfileScreen handles its own onReplySubmit and onReactionPress because it has its own notes state.
+          onRenotePress={handleRenoteOptions}
+          onSharePress={handleShare}
+        />
+      )}
 
 
       <NoteDetailModal
@@ -875,27 +892,5 @@ function AppContent() {
     </SafeAreaView>
   );
 }
-
-function TabButton({
-  label,
-  active,
-  onPress,
-  colors,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-  colors: any;
-}) {
-  return (
-    <Pressable
-      style={({ pressed }) => [styles.tabButton, active && styles.tabButtonActive, active && { backgroundColor: colors.tabActiveBg }, pressed && styles.buttonPressed]}
-      onPress={onPress}
-    >
-      <Text style={[styles.tabButtonText, { color: colors.tabText }, active && styles.tabButtonTextActive, active && { color: colors.tabActiveText }]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 
 // Helper functions imported from formatting utilities
