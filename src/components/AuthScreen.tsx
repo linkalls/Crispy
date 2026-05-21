@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { ActivityIndicator, Pressable, SafeAreaView, StatusBar, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, View, StatusBar, Text, TextInput } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { styles } from '../styles/styles';
 
 export function AuthScreen({
@@ -15,8 +16,9 @@ export function AuthScreen({
   oauthError: string | null;
   onLogin: () => void;
 }) {
+  const insets = useSafeAreaInsets();
   return (
-    <SafeAreaView style={styles.onboardingScreen}>
+    <View style={[styles.onboardingScreen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <StatusBar barStyle="dark-content" />
       <View style={styles.onboardingCard}>
         <View style={styles.onboardingBrand}>
@@ -59,6 +61,6 @@ export function AuthScreen({
           初回起動時にサーバーを入力し、OAuth(MiAuth) でログインします。
         </Text>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }

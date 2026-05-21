@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Modal,
-  SafeAreaView,
   View,
   Text,
   TextInput,
@@ -15,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ColorScheme, StoredAccount } from '../utils/types';
 import { styles } from '../styles/styles';
 
@@ -37,6 +37,7 @@ export function NoteComposerModal({
   onClose: () => void;
   onSubmit: (text: string, cw: string | null, visibility: string, fileIds: string[]) => Promise<void>;
 }) {
+  const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
   const [cw, setCw] = useState('');
   const [useCw, setUseCw] = useState(false);
@@ -132,7 +133,7 @@ export function NoteComposerModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top, paddingBottom: insets.bottom }}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           
           {/* Header */}
@@ -224,7 +225,7 @@ export function NoteComposerModal({
           </View>
 
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }

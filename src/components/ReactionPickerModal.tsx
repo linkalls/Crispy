@@ -5,8 +5,8 @@ import {
   Text,
   Pressable,
   StyleSheet,
-  SafeAreaView,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ColorScheme, TimelineNote } from "../utils/types";
 
 const DEFAULT_REACTIONS = ["👍", "❤️", "😂", "🎉", "😮", "😢", "🙏", "👀"];
@@ -24,6 +24,7 @@ export function ReactionPickerModal({
   onClose: () => void;
   onSelectReaction: (note: TimelineNote, reaction: string) => void;
 }) {
+  const insets = useSafeAreaInsets();
   if (!note) return null;
 
   return (
@@ -35,7 +36,7 @@ export function ReactionPickerModal({
     >
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <SafeAreaView style={[styles.sheet, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.cardBg, borderColor: colors.border, paddingBottom: Math.max(insets.bottom, 20) }]}>
           <View style={styles.handleContainer}>
             <View style={[styles.handle, { backgroundColor: colors.border }]} />
           </View>
@@ -71,7 +72,7 @@ export function ReactionPickerModal({
           >
             <Text style={[styles.cancelButtonText, { color: colors.text }]}>キャンセル</Text>
           </Pressable>
-        </SafeAreaView>
+        </View>
       </View>
     </Modal>
   );

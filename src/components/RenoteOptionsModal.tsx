@@ -5,9 +5,9 @@ import {
   Text,
   Pressable,
   StyleSheet,
-  SafeAreaView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ColorScheme, TimelineNote } from "../utils/types";
 
 export function RenoteOptionsModal({
@@ -25,6 +25,7 @@ export function RenoteOptionsModal({
   onRenote: (note: TimelineNote) => void;
   onQuote: (note: TimelineNote) => void;
 }) {
+  const insets = useSafeAreaInsets();
   if (!note) return null;
 
   return (
@@ -36,7 +37,7 @@ export function RenoteOptionsModal({
     >
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <SafeAreaView style={[styles.sheet, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.cardBg, borderColor: colors.border, paddingBottom: Math.max(insets.bottom, 20) }]}>
           <View style={styles.handleContainer}>
             <View style={[styles.handle, { backgroundColor: colors.border }]} />
           </View>
@@ -99,7 +100,7 @@ export function RenoteOptionsModal({
           >
             <Text style={[styles.cancelButtonText, { color: colors.text }]}>キャンセル</Text>
           </Pressable>
-        </SafeAreaView>
+        </View>
       </View>
     </Modal>
   );

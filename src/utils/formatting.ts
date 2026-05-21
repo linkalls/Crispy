@@ -39,16 +39,41 @@ export function mapNote(note: MisskeyNote, fallbackHost: string): TimelineNote {
 
   // カスタム絵文字のマップを作成
   const emojiMap: Record<string, string> = {};
-  const allEmojis = [
-    ...(note.emojis || []),
-    ...(target.emojis || []),
-  ];
-  allEmojis.forEach((e) => {
-    if (e.name && e.url) {
-      emojiMap[e.name] = e.url;
-      emojiMap[`:${e.name}:`] = e.url;
+
+  const processEmojis = (emojis: any) => {
+    if (Array.isArray(emojis)) {
+      emojis.forEach((e) => {
+        if (e && e.name && e.url) {
+          emojiMap[e.name] = e.url;
+          emojiMap[`:${e.name}:`] = e.url;
+
+          // Fallback for Misskey specific structure like :name@host:
+          const nameParts = e.name.split('@');
+          if (nameParts.length > 1) {
+             emojiMap[nameParts[0]] = e.url;
+             emojiMap[`:${nameParts[0]}:`] = e.url;
+          }
+        }
+      });
+    } else if (emojis && typeof emojis === 'object') {
+      // In some older Misskey versions, emojis might be an object map Record<string, string>
+      Object.entries(emojis).forEach(([name, url]) => {
+        if (typeof url === 'string') {
+          emojiMap[name] = url;
+          emojiMap[`:${name}:`] = url;
+
+          const nameParts = name.split('@');
+          if (nameParts.length > 1) {
+             emojiMap[nameParts[0]] = url;
+             emojiMap[`:${nameParts[0]}:`] = url;
+          }
+        }
+      });
     }
-  });
+  };
+
+  processEmojis(note.emojis);
+  processEmojis(target.emojis);
 
   if (target.reactionEmojis) {
     Object.entries(target.reactionEmojis).forEach(([name, url]) => {

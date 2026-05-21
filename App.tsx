@@ -21,7 +21,7 @@ import {
   Modal,
   StyleSheet
 } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   MfmRenderer,
   Timeline,
@@ -34,6 +34,7 @@ import {
   BottomNavigation,
   FAB,
   NoteComposerModal,
+  ImageViewerModal,
 } from './src/components';
 import { NotificationsScreen, ExploreScreen, ProfileScreen } from './src/screens';
 import { useMisskey, useMisskeyStream } from './src/hooks';
@@ -112,6 +113,8 @@ function AppContent() {
   const [isNoteComposerVisible, setIsNoteComposerVisible] = useState(false);
   const [toast, setToast] = useState<{ visible: boolean; title: string; message?: string; isError?: boolean }>({ visible: false, title: '' });
   const [isLogoutConfirmVisible, setIsLogoutConfirmVisible] = useState(false);
+  const [viewingImageUrl, setViewingImageUrl] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
   
   const showToast = (title: string, message?: string, isError = false) => {
     setToast({ visible: true, title, message, isError });
@@ -511,7 +514,7 @@ function AppContent() {
 
   if (!activeAccount) {
     return (
-      <SafeAreaView style={styles.onboardingScreen}>
+      <View style={[styles.onboardingScreen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <StatusBar style={isDark ? "light" : "dark"} />
         <View style={styles.onboardingCard}>
           <View style={styles.onboardingBrand}>
@@ -554,12 +557,12 @@ function AppContent() {
             初回起動時にサーバーを入力し、OAuth(MiAuth) でログインします。
           </Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]}>
+    <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <StatusBar style="dark" />
 
       <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
@@ -603,7 +606,7 @@ function AppContent() {
           setOauthError(null);
         }}
       >
-        <SafeAreaView style={{ flex: 1, justifyContent: "flex-end" }}>
+        <View style={{ flex: 1, justifyContent: "flex-end", paddingTop: insets.top, paddingBottom: insets.bottom }}>
           <Pressable
             style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
             onPress={() => {
@@ -716,7 +719,7 @@ function AppContent() {
               <Text style={styles.logoutBtnText}>@ {activeAccount.username} をログアウト</Text>
             </Pressable>
           </View>
-        </SafeAreaView>
+        </View>
       </Modal>
 
       {mainTab === 'home' && (
@@ -752,9 +755,10 @@ function AppContent() {
             setSelectedNoteForDetail(note);
             setIsDetailModalVisible(true);
           }}
+          onImagePress={(url) => setViewingImageUrl(url)}
         />
       )}
-      {mainTab === 'explore' && <ExploreScreen colors={colors} />}
+      {mainTab === 'explore' && <ExploreScreen colors={colors} onImagePress={(url) => setViewingImageUrl(url)} />}
       {mainTab === 'notifications' && <NotificationsScreen colors={colors} activeAccount={activeAccount} misskeyRequest={misskeyRequest} />}
       {mainTab === 'profile' && (
         <ProfileScreen
@@ -765,6 +769,7 @@ function AppContent() {
             setSelectedNoteForDetail(note);
             setIsDetailModalVisible(true);
           }}
+          onImagePress={(url) => setViewingImageUrl(url)}
           onReplyPress={(noteOrId) => {
             // Timeline passes noteId string, ProfileScreen is updated to pass the full note object.
             // So noteOrId is TimelineNote if from ProfileScreen.
@@ -803,6 +808,13 @@ function AppContent() {
         onReplySubmitSuccess={() => {
           loadTimeline(true);
         }}
+        onImagePress={(url) => setViewingImageUrl(url)}
+      />
+
+      <ImageViewerModal
+        visible={!!viewingImageUrl}
+        imageUrl={viewingImageUrl}
+        onClose={() => setViewingImageUrl(null)}
       />
 
       <QuoteComposerModal
@@ -897,7 +909,7 @@ function AppContent() {
           }
         }}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 

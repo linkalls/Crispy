@@ -19,6 +19,7 @@ export function Note({
   onRenotePress,
   onSharePress,
   onReactionPress,
+  onImagePress,
 }: {
   note: TimelineNote;
   isReplying: boolean;
@@ -32,6 +33,7 @@ export function Note({
   onRenotePress: () => void;
   onSharePress: () => void;
   onReactionPress: (index: number) => void;
+  onImagePress?: (url: string) => void;
 }) {
   return (
     <Pressable
@@ -89,11 +91,13 @@ export function Note({
                 return (
                   <View key={idx} style={styles.mediaItem}>
                     {isImage || isVideo ? (
-                      <Image
-                        source={{ uri: file.thumbnailUrl || file.url }}
-                        style={styles.mediaImage}
-                        resizeMode="cover"
-                      />
+                      <Pressable onPress={() => onImagePress && onImagePress(file.url)}>
+                        <Image
+                          source={{ uri: file.thumbnailUrl || file.url }}
+                          style={styles.mediaImage}
+                          resizeMode="cover"
+                        />
+                      </Pressable>
                     ) : (
                       <View style={[styles.mediaFile, { backgroundColor: colors.reactionBg }]}>
                         <Ionicons name="document-outline" size={24} color={colors.textMuted} />
@@ -133,11 +137,13 @@ export function Note({
                     return (
                       <View key={idx} style={styles.quoteMediaItem}>
                         {isImage || isVideo ? (
-                          <Image
-                            source={{ uri: file.thumbnailUrl || file.url }}
-                            style={styles.quoteMediaImage}
-                            resizeMode="cover"
-                          />
+                          <Pressable onPress={() => onImagePress && onImagePress(file.url)}>
+                            <Image
+                              source={{ uri: file.thumbnailUrl || file.url }}
+                              style={styles.quoteMediaImage}
+                              resizeMode="cover"
+                            />
+                          </Pressable>
                         ) : (
                           <View style={[styles.quoteMediaFile, { backgroundColor: colors.reactionBg }]}>
                             <Ionicons name="document-outline" size={14} color={colors.textMuted} />

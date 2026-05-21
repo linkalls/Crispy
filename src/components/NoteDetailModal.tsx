@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Modal,
-  SafeAreaView,
   View,
   Text,
   TextInput,
@@ -14,6 +13,7 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ColorScheme, TimelineNote, MisskeyNote } from "../utils/types";
 import { MfmRenderer } from "./MfmRenderer";
 import { ReplyComposer } from "./ReplyComposer";
@@ -32,6 +32,7 @@ export function NoteDetailModal({
   onSharePress,
   onReplySubmitSuccess,
   onShowToast,
+  onImagePress,
 }: {
   visible: boolean;
   note: TimelineNote | null;
@@ -44,7 +45,9 @@ export function NoteDetailModal({
   onSharePress: (note: TimelineNote) => void;
   onReplySubmitSuccess: () => void;
   onShowToast: (title: string, msg?: string, isErr?: boolean) => void;
+  onImagePress?: (url: string) => void;
 }) {
+  const insets = useSafeAreaInsets();
   const [replies, setReplies] = useState<TimelineNote[]>([]);
   const [loadingReplies, setLoadingReplies] = useState(false);
   const [replyText, setReplyText] = useState("");
@@ -122,7 +125,7 @@ export function NoteDetailModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={{ flex: 1 }}
@@ -183,11 +186,13 @@ export function NoteDetailModal({
                     return (
                       <View key={idx} style={styles.mainNoteMediaItem}>
                         {isImage || isVideo ? (
-                          <Image
-                            source={{ uri: file.thumbnailUrl || file.url }}
-                            style={styles.mainNoteMediaImage}
-                            resizeMode="cover"
-                          />
+                          <Pressable onPress={() => onImagePress && onImagePress(file.url)}>
+                            <Image
+                              source={{ uri: file.thumbnailUrl || file.url }}
+                              style={styles.mainNoteMediaImage}
+                              resizeMode="cover"
+                            />
+                          </Pressable>
                         ) : (
                           <View style={[styles.mainNoteMediaFile, { backgroundColor: colors.reactionBg }]}>
                             <Ionicons name="document-outline" size={32} color={colors.textMuted} />
@@ -340,11 +345,13 @@ export function NoteDetailModal({
                               return (
                                 <View key={fIdx} style={styles.replyMediaItem}>
                                   {isImage || isVideo ? (
-                                    <Image
-                                      source={{ uri: file.thumbnailUrl || file.url }}
-                                      style={styles.replyMediaImage}
-                                      resizeMode="cover"
-                                    />
+                                    <Pressable onPress={() => onImagePress && onImagePress(file.url)}>
+                                      <Image
+                                        source={{ uri: file.thumbnailUrl || file.url }}
+                                        style={styles.replyMediaImage}
+                                        resizeMode="cover"
+                                      />
+                                    </Pressable>
                                   ) : (
                                     <View style={[styles.replyMediaFile, { backgroundColor: colors.reactionBg }]}>
                                       <Ionicons name="document-outline" size={14} color={colors.textMuted} />
@@ -403,7 +410,7 @@ export function NoteDetailModal({
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }

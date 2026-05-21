@@ -37,6 +37,7 @@ export function ProfileScreen({
   onRenotePress,
   onSharePress,
   onReactionPress,
+  onImagePress,
 }: {
   colors: ColorScheme;
   activeAccount: StoredAccount | null;
@@ -46,6 +47,7 @@ export function ProfileScreen({
   onRenotePress?: (note: TimelineNote) => void;
   onSharePress?: (note: TimelineNote) => void;
   onReactionPress?: (noteOrId: string | TimelineNote, index: number) => void;
+  onImagePress?: (url: string) => void;
 }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [notes, setNotes] = useState<TimelineNote[]>([]);
@@ -204,6 +206,7 @@ export function ProfileScreen({
       onRenotePress={() => onRenotePress?.(item)}
       onSharePress={() => onSharePress?.(item)}
       onReactionPress={(index) => onReactionPress?.(item, index)}
+      onImagePress={onImagePress}
     />
   );
 

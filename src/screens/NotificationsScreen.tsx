@@ -95,11 +95,13 @@ export function NotificationsScreen({
   const [notifications, setNotifications] = useState<MisskeyNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const loadNotifications = useCallback(async (isRefresh = false) => {
     if (!activeAccount) return;
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
+    setError(null);
 
     try {
       // Mock data for test account
@@ -144,10 +146,16 @@ export function NotificationsScreen({
         ]);
       } else {
         const data = await misskeyRequest<MisskeyNotification[]>('/api/i/notifications', { limit: 30 }, true);
-        setNotifications(data);
+        if (Array.isArray(data)) {
+          setNotifications(data);
+        } else {
+          setNotifications([]);
+          setError("通知データの形式が不正です。");
+        }
       }
     } catch (e) {
       console.error('Failed to load notifications:', e);
+      setError(e instanceof Error ? e.message : '通知を読み込めませんでした。');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -208,11 +216,21 @@ export function NotificationsScreen({
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={() => loadNotifications(true)} tintColor={colors.primary} />
       }
+      ListHeaderComponent={
+        error ? (
+          <View style={{ padding: 16, backgroundColor: '#ffe3e3', marginHorizontal: 16, marginTop: 16, borderRadius: 8 }}>
+            <Text style={{ color: '#c92a2a', fontWeight: 'bold' }}>エラーが発生しました</Text>
+            <Text style={{ color: '#c92a2a', marginTop: 4 }}>{error}</Text>
+          </View>
+        ) : null
+      }
       ListEmptyComponent={
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 80 }}>
-          <Ionicons name="notifications-off-outline" size={48} color={colors.textMuted} />
-          <Text style={{ color: colors.textMuted, marginTop: 12, fontSize: 16 }}>通知はありません</Text>
-        </View>
+        !error && !loading ? (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 80 }}>
+            <Ionicons name="notifications-off-outline" size={48} color={colors.textMuted} />
+            <Text style={{ color: colors.textMuted, marginTop: 12, fontSize: 16 }}>通知はありません</Text>
+          </View>
+        ) : null
       }
     />
   );

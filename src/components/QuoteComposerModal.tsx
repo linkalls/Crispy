@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import {
   Modal,
-  SafeAreaView,
   View,
   Text,
   TextInput,
@@ -12,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ColorScheme, TimelineNote } from "../utils/types";
 import { MfmRenderer } from "./MfmRenderer";
 import * as mfm from "mfm-js";
@@ -29,6 +29,7 @@ export function QuoteComposerModal({
   onClose: () => void;
   onSubmit: (text: string) => Promise<void>;
 }) {
+  const insets = useSafeAreaInsets();
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -51,7 +52,7 @@ export function QuoteComposerModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={{ flex: 1 }}
@@ -108,7 +109,7 @@ export function QuoteComposerModal({
             </View>
           </View>
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }
