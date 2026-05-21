@@ -73,16 +73,8 @@ export default function App() {
 
 function AppContent() {
   const [hydrated, setHydrated] = useState(false);
-  const [accounts, setAccounts] = useState<StoredAccount[]>([{
-    id: 'test-account',
-    host: 'sushi.ski',
-    token: '',
-    userId: 'test',
-    username: 'testuser',
-    displayName: 'Test User',
-    avatarUrl: DEFAULT_AVATAR
-  }]);
-  const [activeAccountId, setActiveAccountId] = useState<string | null>('test-account');
+  const [accounts, setAccounts] = useState<StoredAccount[]>([]);
+  const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
   const [devMode, setDevMode] = useState(false);
   const [themeMode, setThemeMode] = useState<'system' | 'light' | 'dark'>('system');
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
@@ -131,8 +123,8 @@ function AppContent() {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         if (!raw) return;
         const parsed = JSON.parse(raw) as PersistedState;
-        // if (Array.isArray(parsed.accounts)) setAccounts(parsed.accounts);
-        // setActiveAccountId(parsed.activeAccountId ?? null);
+        if (Array.isArray(parsed.accounts)) setAccounts(parsed.accounts);
+        setActiveAccountId(parsed.activeAccountId ?? null);
         setDevMode(Boolean(parsed.devMode));
         if (parsed.themeMode) setThemeMode(parsed.themeMode);
       } catch {
@@ -344,8 +336,12 @@ function AppContent() {
     }
   };
 
-  const handleReactionToggle = async (noteId: string, reactionIndex: number) => {
-    const note = notes.find((item) => item.id === noteId);
+  const handleReactionToggle = async (noteOrId: string | TimelineNote, reactionIndex: number) => {
+    const noteId = typeof noteOrId === 'string' ? noteOrId : noteOrId.id;
+    let note = typeof noteOrId === 'string' ? notes.find((item) => item.id === noteId) : noteOrId;
+    if (!note) {
+      note = selectedNoteForDetail?.id === noteId ? selectedNoteForDetail : undefined;
+    }
     if (!note || !activeAccount) return;
 
     const target = note.reactions[reactionIndex];
@@ -589,11 +585,13 @@ function AppContent() {
         </Pressable>
       </View>
 
-      <View style={[styles.tabBar, { backgroundColor: colors.tabBg }]}>
-        <TabButton label="For You" active={activeTab === 'home'} onPress={() => setActiveTab('home')} colors={colors} />
-        <TabButton label="Local" active={activeTab === 'local'} onPress={() => setActiveTab('local')} colors={colors} />
-        <TabButton label="Global" active={activeTab === 'global'} onPress={() => setActiveTab('global')} colors={colors} />
-      </View>
+      {mainTab === 'home' && (
+        <View style={[styles.tabBar, { backgroundColor: colors.tabBg }]}>
+          <TabButton label="For You" active={activeTab === 'home'} onPress={() => setActiveTab('home')} colors={colors} />
+          <TabButton label="Local" active={activeTab === 'local'} onPress={() => setActiveTab('local')} colors={colors} />
+          <TabButton label="Global" active={activeTab === 'global'} onPress={() => setActiveTab('global')} colors={colors} />
+        </View>
+      )}
 
       <Modal
         visible={accountMenuOpen}
@@ -758,7 +756,34 @@ function AppContent() {
       )}
       {mainTab === 'explore' && <ExploreScreen colors={colors} />}
       {mainTab === 'notifications' && <NotificationsScreen colors={colors} activeAccount={activeAccount} misskeyRequest={misskeyRequest} />}
-      {mainTab === 'profile' && <ProfileScreen colors={colors} activeAccount={activeAccount} misskeyRequest={misskeyRequest} />}
+      {mainTab === 'profile' && (
+        <ProfileScreen
+          colors={colors}
+          activeAccount={activeAccount}
+          misskeyRequest={misskeyRequest}
+          onNotePress={(note) => {
+            setSelectedNoteForDetail(note);
+            setIsDetailModalVisible(true);
+          }}
+          onReplyPress={(noteOrId) => {
+            // Timeline passes noteId string, ProfileScreen is updated to pass the full note object.
+            // So noteOrId is TimelineNote if from ProfileScreen.
+            if (typeof noteOrId === 'object' && noteOrId !== null && 'id' in noteOrId) {
+              setSelectedNoteForDetail(noteOrId as any);
+              setIsDetailModalVisible(true);
+            } else {
+               const note = notes.find((n) => n.id === noteOrId);
+               if (note) {
+                 setSelectedNoteForDetail(note);
+                 setIsDetailModalVisible(true);
+               }
+            }
+          }}
+          onRenotePress={handleRenoteOptions}
+          onSharePress={handleShare}
+          onReactionPress={handleReactionToggle}
+        />
+      )}
 
 
       <NoteDetailModal

@@ -5,7 +5,7 @@ import { Animated, Image, Text } from 'react-native';
 import { noteContentStyle } from '../styles/styles';
 import { ColorScheme } from '../utils/types';
 
-function MfmFunctionNode({ node, childrenNodes }: { node: any; childrenNodes: React.ReactNode }) {
+function MfmFunctionNode({ node, children }: { node: any; children: React.ReactNode }) {
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -41,25 +41,25 @@ function MfmFunctionNode({ node, childrenNodes }: { node: any; childrenNodes: Re
       inputRange: [0, 1],
       outputRange: ['0deg', '360deg'],
     });
-    return <Animated.View style={{ transform: [{ rotate }] }}><Text>{childrenNodes}</Text></Animated.View>;
+    return <Animated.View style={{ transform: [{ rotate }] }}><Text>{children}</Text></Animated.View>;
   }
   if (node.props.name === 'jelly') {
     const scale = anim.interpolate({
       inputRange: [0, 1],
       outputRange: [1, 1.2],
     });
-    return <Animated.View style={{ transform: [{ scale }] }}><Text>{childrenNodes}</Text></Animated.View>;
+    return <Animated.View style={{ transform: [{ scale }] }}><Text>{children}</Text></Animated.View>;
   }
   if (node.props.name === 'tada' || node.props.name === 'shake') {
     const rotate = anim.interpolate({
       inputRange: [-1, 0, 1],
       outputRange: ['-10deg', '0deg', '10deg'],
     });
-    return <Animated.View style={{ transform: [{ rotate }] }}><Text>{childrenNodes}</Text></Animated.View>;
+    return <Animated.View style={{ transform: [{ rotate }] }}><Text>{children}</Text></Animated.View>;
   }
 
   // フォールバック
-  return <Text>{childrenNodes}</Text>;
+  return <Text>{children}</Text>;
 }
 
 export function MfmRenderer({
@@ -164,9 +164,7 @@ export function MfmRenderer({
       }
       if (node.type === 'fn') {
         return (
-          <MfmFunctionNode key={key} node={node}>
-            {renderNodes(node.children, key)}
-          </MfmFunctionNode>
+          <MfmFunctionNode key={key} node={node}>{renderNodes(node.children, key)}</MfmFunctionNode>
         );
       }
       if ('children' in node && Array.isArray(node.children)) {
