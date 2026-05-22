@@ -374,10 +374,7 @@ function AppContent() {
     try {
       await misskeyRequest(
         nextReacted ? '/api/notes/reactions/create' : '/api/notes/reactions/delete',
-        {
-          noteId,
-          reaction: target.emoji,
-        },
+        nextReacted ? { noteId: note.targetId, reaction: target.emoji } : { noteId: note.targetId },
         true
       );
     } catch (error) {
@@ -402,6 +399,11 @@ function AppContent() {
   const performReaction = async (note: TimelineNote, reaction: string) => {
     if (!activeAccount) return;
     try {
+      const existingReaction = note.reactions.find(r => r.reacted);
+      if (existingReaction) {
+        if (existingReaction.emoji === reaction) return; // Already reacted with this
+        await misskeyRequest('/api/notes/reactions/delete', { noteId: note.targetId }, true);
+      }
       await misskeyRequest('/api/notes/reactions/create', { noteId: note.targetId, reaction }, true);
       showToast('成功', 'リアクションしました。');
       loadTimeline(true);
@@ -761,7 +763,27 @@ function AppContent() {
           }}
         />
       )}
-      {mainTab === 'explore' && <ExploreScreen colors={colors} />}
+      {mainTab === 'explore' && (
+        <ExploreScreen
+          colors={colors}
+          activeAccount={activeAccount}
+          misskeyRequest={misskeyRequest}
+          onNotePress={(note) => {
+            setSelectedNoteForDetail(note);
+            setIsDetailModalVisible(true);
+          }}
+          onReplyPress={(noteOrId) => {
+            const note = typeof noteOrId === 'string' ? notes.find((n) => n.id === noteOrId) : noteOrId;
+            if (note) {
+              setSelectedNoteForDetail(note as any);
+              setIsDetailModalVisible(true);
+            }
+          }}
+          onRenotePress={handleRenoteOptions}
+          onSharePress={handleShare}
+          onReactionPress={handleReactionToggle}
+        />
+      )}
       {mainTab === 'notifications' && <NotificationsScreen colors={colors} activeAccount={activeAccount} misskeyRequest={misskeyRequest} />}
       {mainTab === 'profile' && (
         <ProfileScreen

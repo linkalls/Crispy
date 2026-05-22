@@ -1,0 +1,39 @@
+$ expo start --web
+Starting project at /app
+Starting Metro Bundler
+The following packages should be updated for best compatibility with the installed expo version:
+  react-native-safe-area-context@5.8.0 - expected version: ~5.6.0
+Your project may not work correctly until you install the expected versions of the packages.
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Web ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web ./index.ts ▓▓▓▓▓▓▓▓▓▓░░░░░░ 67.1% (127/190)
+Web ./index.ts ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 90.7% (404/431)
+Web Bundled 7659ms index.ts (457 modules)
+ LOG  [web] Logs will appear in the browser console
+Web ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 29ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 31ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 32ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web Bundled 28ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 29ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web Bundled 40ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 34ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web Bundled 31ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web ./index.ts ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 33ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web Bundled 46ms index.ts (1 module)
+ LOG  [web] Logs will appear in the browser console
