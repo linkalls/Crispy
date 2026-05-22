@@ -320,6 +320,7 @@ function AppContent() {
       'read:notes',
       'write:notes',
       'write:reactions',
+      'read:notifications',
       'write:notifications',
     ].join(',');
 
@@ -343,6 +344,12 @@ function AppContent() {
       note = selectedNoteForDetail?.id === noteId ? selectedNoteForDetail : undefined;
     }
     if (!note || !activeAccount) return;
+
+    if (reactionIndex === -1) {
+      setSelectedNoteForReaction(note);
+      setIsReactionPickerVisible(true);
+      return;
+    }
 
     const target = note.reactions[reactionIndex];
     if (!target) return;
