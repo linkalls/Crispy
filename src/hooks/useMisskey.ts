@@ -47,6 +47,25 @@ export function useMisskey(activeAccount: StoredAccount | null) {
             }
           ] as unknown as T;
         }
+        if (path === '/api/notes/search') {
+          return [
+            {
+              id: 'mock_search_1',
+              createdAt: new Date().toISOString(),
+              text: `「${(payload.query as string) || ''}」の検索結果のモックです！`,
+              user: {
+                id: 'mock_user_search',
+                name: 'Searcher',
+                username: 'searcher',
+                avatarUrl: 'https://sushi.ski/identicon/searcher',
+                host: null,
+              },
+              repliesCount: 0,
+              renotesCount: 0,
+              reactions: {},
+            }
+          ] as unknown as T;
+        }
         if (path.includes('timeline')) {
           return [
             {

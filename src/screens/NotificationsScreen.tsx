@@ -12,61 +12,74 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { ColorScheme, StoredAccount } from '../utils/types';
 
+type MisskeyUser = {
+  id: string;
+  name?: string | null;
+  username: string;
+  host?: string | null;
+  avatarUrl?: string | null;
+};
+
 type MisskeyNotification = {
   id: string;
   type: string;
   createdAt: string;
-  user?: {
-    id: string;
-    name?: string | null;
-    username: string;
-    host?: string | null;
-    avatarUrl?: string | null;
-  };
+  user?: MisskeyUser;
   note?: {
     id: string;
     text?: string | null;
   };
   reaction?: string;
+  reactions?: Array<{
+    user: MisskeyUser;
+    reaction: string;
+  }>;
+  users?: Array<MisskeyUser>;
 };
 
 function getNotificationIcon(type: string): { name: string; color: string } {
+  if (type.startsWith('reaction')) return { name: 'heart', color: '#ff6b6b' };
+  if (type.startsWith('renote')) return { name: 'repeat', color: '#51cf66' };
   switch (type) {
-    case 'reaction':
-      return { name: 'heart', color: '#ff6b6b' };
     case 'reply':
       return { name: 'chatbubble', color: '#4dabf7' };
-    case 'renote':
-      return { name: 'repeat', color: '#51cf66' };
     case 'quote':
       return { name: 'chatbubble-ellipses', color: '#845ef7' };
     case 'follow':
+    case 'receiveFollowRequest':
+    case 'followRequestAccepted':
       return { name: 'person-add', color: '#339af0' };
     case 'mention':
       return { name: 'at', color: '#f59f00' };
     case 'pollEnded':
       return { name: 'bar-chart', color: '#20c997' };
+    case 'achievementEarned':
+      return { name: 'trophy', color: '#fcc419' };
     default:
       return { name: 'notifications', color: '#868e96' };
   }
 }
 
 function getNotificationMessage(type: string, reaction?: string): string {
+  if (type.startsWith('reaction')) return `${reaction || ''} リアクションしました`;
+  if (type.startsWith('renote')) return 'リノートしました';
   switch (type) {
-    case 'reaction':
-      return `${reaction || ''} リアクションしました`;
     case 'reply':
       return '返信しました';
-    case 'renote':
-      return 'リノートしました';
     case 'quote':
       return '引用しました';
     case 'follow':
       return 'フォローしました';
+    case 'receiveFollowRequest':
+      return 'フォローリクエストが届きました';
+    case 'followRequestAccepted':
+      return 'フォローリクエストが承認されました';
     case 'mention':
       return 'メンションしました';
     case 'pollEnded':
       return '投票が終了しました';
+    case 'achievementEarned':
+      return '実績を解除しました';
     default:
       return '通知';
   }
@@ -106,6 +119,16 @@ export function NotificationsScreen({
       // Not mocking if we have a real token, but test account is gone. Let's just always request if no mock_token
       if (activeAccount.token === 'mock_token') {
         setNotifications([
+          {
+            id: 'notif_grouped_1',
+            type: 'reaction:grouped',
+            createdAt: new Date(Date.now() - 60000).toISOString(),
+            reactions: [
+              { user: { id: 'u0', name: 'Zack', username: 'zack', avatarUrl: 'https://sushi.ski/identicon/zack' }, reaction: '❤️' },
+              { user: { id: 'u1', name: 'Alice', username: 'alice', avatarUrl: 'https://sushi.ski/identicon/alice' }, reaction: '❤️' },
+            ],
+            note: { id: 'n0', text: 'すごい！' },
+          },
           {
             id: 'notif_1',
             type: 'reaction',
@@ -160,9 +183,31 @@ export function NotificationsScreen({
 
   const renderNotification = ({ item }: { item: MisskeyNotification }) => {
     const icon = getNotificationIcon(item.type);
-    const message = getNotificationMessage(item.type, item.reaction);
-    const userName = item.user?.name || item.user?.username || '不明';
-    const userHost = item.user?.host ? `@${item.user.host}` : '';
+
+    let targetUser = item.user;
+    if (item.type === 'reaction:grouped' && item.reactions && item.reactions.length > 0) {
+      targetUser = item.reactions[item.reactions.length - 1].user;
+    } else if (item.type === 'renote:grouped' && item.users && item.users.length > 0) {
+      targetUser = item.users[item.users.length - 1];
+    }
+
+    let reactionEmoji = item.reaction;
+    if (item.type === 'reaction:grouped' && item.reactions && item.reactions.length > 0) {
+      reactionEmoji = item.reactions[item.reactions.length - 1].reaction;
+    }
+
+    let message = getNotificationMessage(item.type, reactionEmoji);
+    let userName = targetUser?.name || targetUser?.username || '不明';
+    let userHost = targetUser?.host ? `@${targetUser.host}` : '';
+    let suffix = '';
+
+    if (item.type === 'reaction:grouped' && item.reactions && item.reactions.length > 1) {
+      suffix = ` ほか${item.reactions.length - 1}人`;
+      message = `${item.reactions.length}件のリアクション`;
+    } else if (item.type === 'renote:grouped' && item.users && item.users.length > 1) {
+      suffix = ` ほか${item.users.length - 1}人`;
+      message = `${item.users.length}件のリノート`;
+    }
 
     return (
       <View style={[localStyles.notifItem, { borderBottomColor: colors.border }]}>
@@ -170,13 +215,13 @@ export function NotificationsScreen({
           <Ionicons name={icon.name as any} size={20} color={icon.color} />
         </View>
         <Image
-          source={{ uri: item.user?.avatarUrl || 'https://api.dicebear.com/9.x/avataaars/svg?seed=default' }}
+          source={{ uri: targetUser?.avatarUrl || 'https://api.dicebear.com/9.x/avataaars/svg?seed=default' }}
           style={localStyles.avatar}
         />
         <View style={{ flex: 1 }}>
           <Text style={[localStyles.userName, { color: colors.text }]} numberOfLines={1}>
             {userName}
-            <Text style={{ color: colors.textMuted, fontWeight: '400', fontSize: 13 }}> @{item.user?.username}{userHost}</Text>
+            <Text style={{ color: colors.textMuted, fontWeight: '400', fontSize: 13 }}>{suffix} @{targetUser?.username}{userHost}</Text>
           </Text>
           <Text style={[localStyles.message, { color: colors.textMuted }]}>{message}</Text>
           {item.note?.text && (
