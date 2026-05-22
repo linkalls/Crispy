@@ -42,6 +42,7 @@ export type TimelineNote = {
   content: string;
   createdAtLabel: string;
   user: {
+    id: string;
     name: string;
     username: string;
     host: string;

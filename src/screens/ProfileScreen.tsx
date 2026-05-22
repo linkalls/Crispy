@@ -37,6 +37,9 @@ export function ProfileScreen({
   onRenotePress,
   onSharePress,
   onReactionPress,
+  viewingUserId,
+  onBack,
+  onUserPress,
 }: {
   colors: ColorScheme;
   activeAccount: StoredAccount | null;
@@ -46,6 +49,9 @@ export function ProfileScreen({
   onRenotePress?: (note: TimelineNote) => void;
   onSharePress?: (note: TimelineNote) => void;
   onReactionPress?: (noteOrId: string | TimelineNote, index: number) => void;
+  viewingUserId?: string | null;
+  onBack?: () => void;
+  onUserPress?: (userId: string) => void;
 }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [notes, setNotes] = useState<TimelineNote[]>([]);
@@ -80,7 +86,7 @@ export function ProfileScreen({
             targetId: 'my_note_1',
             content: 'Crispyの開発が順調に進んでいます！画像添付機能も実装しました 🎉',
             createdAtLabel: '3時間前',
-            user: { name: 'Test User', username: 'testuser', host: 'sushi.ski', avatar: activeAccount.avatarUrl },
+            user: { id: 'test', name: 'Test User', username: 'testuser', host: 'sushi.ski', avatar: activeAccount.avatarUrl },
             renoteUser: null,
             reactions: [{ emoji: '👍', count: 3, reacted: false, isCustom: false }],
             replies: 1,
@@ -95,7 +101,7 @@ export function ProfileScreen({
             targetId: 'my_note_2',
             content: 'ボトムナビゲーションとFABを追加しました。だいぶアプリらしくなってきた！',
             createdAtLabel: '1日前',
-            user: { name: 'Test User', username: 'testuser', host: 'sushi.ski', avatar: activeAccount.avatarUrl },
+            user: { id: 'test', name: 'Test User', username: 'testuser', host: 'sushi.ski', avatar: activeAccount.avatarUrl },
             renoteUser: null,
             reactions: [{ emoji: '🎉', count: 5, reacted: true, isCustom: false }],
             replies: 2,
@@ -107,9 +113,10 @@ export function ProfileScreen({
           },
         ]);
       } else {
+        const targetUserId = viewingUserId || activeAccount.userId;
         const [userInfo, userNotes] = await Promise.all([
-          misskeyRequest<UserProfile>('/api/users/show', { userId: activeAccount.userId }, true),
-          misskeyRequest<any[]>('/api/users/notes', { userId: activeAccount.userId, limit: 20 }, true),
+          misskeyRequest<UserProfile>('/api/users/show', { userId: targetUserId }, true),
+          misskeyRequest<any[]>('/api/users/notes', { userId: targetUserId, limit: 20 }, true),
         ]);
         setProfile(userInfo);
         setNotes(userNotes.map((n) => mapNote(n, activeAccount.host)));
@@ -138,6 +145,14 @@ export function ProfileScreen({
     <View>
       {/* Banner */}
       <View style={[localStyles.bannerWrap, { backgroundColor: colors.primary }]}>
+        {onBack && (
+          <Pressable
+            style={localStyles.backButton}
+            onPress={onBack}
+          >
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </Pressable>
+        )}
         {profile?.bannerUrl && (
           <Image source={{ uri: profile.bannerUrl }} style={localStyles.banner} />
         )}
@@ -204,6 +219,7 @@ export function ProfileScreen({
       onRenotePress={() => onRenotePress?.(item)}
       onSharePress={() => onSharePress?.(item)}
       onReactionPress={(index) => onReactionPress?.(item, index)}
+      onUserPress={onUserPress}
     />
   );
 
@@ -235,6 +251,18 @@ const localStyles = StyleSheet.create({
   banner: {
     width: '100%',
     height: '100%',
+  },
+  backButton: {
+    position: 'absolute',
+    top: 40,
+    left: 16,
+    zIndex: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   avatarWrap: {
     position: 'absolute',

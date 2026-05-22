@@ -85,6 +85,7 @@ export function mapNote(note: MisskeyNote, fallbackHost: string): TimelineNote {
     content: content || (note.renote ? "" : "(no text)"),
     createdAtLabel: toRelativeTime(target.createdAt),
     user: {
+      id: target.user.id || '',
       name: target.user.name || target.user.username,
       username: target.user.username,
       host: target.user.host || fallbackHost,
