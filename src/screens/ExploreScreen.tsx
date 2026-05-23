@@ -45,6 +45,33 @@ export function ExploreScreen({
     }
   }, [query, activeAccount, misskeyRequest]);
 
+
+  const handleReactionPress = (noteOrId: string | TimelineNote, index: number) => {
+    const noteId = typeof noteOrId === 'string' ? noteOrId : noteOrId.id;
+    let note = typeof noteOrId === 'string' ? notes.find(n => n.id === noteId) : noteOrId;
+    if (!note) return;
+
+    if (index !== -1) {
+      const target = note.reactions[index];
+      if (target) {
+        const nextReacted = !target.reacted;
+        setNotes(current =>
+          current.map(item => {
+            if (item.id !== noteId) return item;
+            const reactions = [...item.reactions];
+            reactions[index] = {
+              ...target,
+              reacted: nextReacted,
+              count: Math.max(0, target.count + (nextReacted ? 1 : -1)),
+            };
+            return { ...item, reactions };
+          })
+        );
+      }
+    }
+    onReactionPress(note, index);
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={[styles.searchBarContainer, { borderBottomColor: colors.border, backgroundColor: colors.cardBg }]}>
@@ -81,7 +108,7 @@ export function ExploreScreen({
           onReplyPress={onReplyPress}
           onRenotePress={onRenotePress}
           onSharePress={onSharePress}
-          onReactionPress={onReactionPress}
+          onReactionPress={handleReactionPress}
           onUserPress={onUserPress}
         />
       ) : searched ? (

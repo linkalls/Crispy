@@ -39,10 +39,9 @@ export function mapNote(note: MisskeyNote, fallbackHost: string): TimelineNote {
 
   // カスタム絵文字のマップを作成
   const emojiMap: Record<string, string> = {};
-  const allEmojis = [
-    ...(note.emojis || []),
-    ...(target.emojis || []),
-  ];
+  const noteEmojis = Array.isArray(note.emojis) ? note.emojis : [];
+  const targetEmojis = Array.isArray(target.emojis) ? target.emojis : [];
+  const allEmojis = [...noteEmojis, ...targetEmojis];
   allEmojis.forEach((e) => {
     if (e.name && e.url) {
       emojiMap[e.name] = e.url;

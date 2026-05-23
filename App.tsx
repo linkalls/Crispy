@@ -940,7 +940,7 @@ function AppContent() {
         <FAB onPress={() => setIsNoteComposerVisible(true)} colors={colors} />
       )}
       
-      <BottomNavigation activeTab={mainTab} onTabChange={setMainTab} colors={colors} />
+      <BottomNavigation activeTab={mainTab} onTabChange={(tab) => { setMainTab(tab); setViewingUserId(null); }} colors={colors} />
 
       <NoteComposerModal
         visible={isNoteComposerVisible}
