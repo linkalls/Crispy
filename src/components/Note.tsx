@@ -67,13 +67,23 @@ export function Note({
 
       {/* ノート本体 */}
       <View style={styles.noteRow}>
-        <Pressable onPress={() => { if (note.user.id) onUserPress?.(note.user.id); }}>
+        <Pressable
+          onPress={(e) => {
+            e.stopPropagation();
+            if (note.user.id) onUserPress?.(note.user.id);
+          }}
+        >
           <Image source={{ uri: note.user.avatar }} style={styles.noteAvatar} />
         </Pressable>
         <View style={styles.noteMain}>
           {/* ユーザー情報 */}
           <View style={styles.noteHeaderRow}>
-            <Pressable onPress={() => { if (note.user.id) onUserPress?.(note.user.id); }}>
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
+                if (note.user.id) onUserPress?.(note.user.id);
+              }}
+            >
               <Text style={[styles.noteName, { color: colors.text }]} numberOfLines={1}>
                 {note.user.name}
               </Text>

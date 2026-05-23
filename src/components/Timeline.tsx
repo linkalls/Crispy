@@ -103,6 +103,7 @@ export function Timeline({
           onRenotePress={() => onRenotePress(note)}
           onSharePress={() => onSharePress(note)}
           onReactionPress={(index) => onReactionPress(note.id, index)}
+          onUserPress={onUserPress}
         />
       )}
     />

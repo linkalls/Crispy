@@ -760,6 +760,7 @@ function AppContent() {
           onSharePress={handleShare}
           onReactionPress={handleReactionToggle}
           onNotePress={(note) => {
+            console.log('NOTE PRESSED IN APP.TSX', note.id);
             setSelectedNoteForDetail(note);
             setIsDetailModalVisible(true);
           }}
@@ -837,7 +838,89 @@ function AppContent() {
           onReactionPress={handleReactionToggle}
         />
       )}
-      )}
+
+      <NoteDetailModal
+        visible={isDetailModalVisible}
+        note={selectedNoteForDetail}
+        colors={colors}
+        activeAccountHost={activeAccount?.host || ''}
+        misskeyRequest={misskeyRequest}
+        onShowToast={showToast}
+        onClose={() => {
+          setIsDetailModalVisible(false);
+          setSelectedNoteForDetail(null);
+        }}
+        onReactionPress={handleReactionToggle}
+        onRenotePress={handleRenoteOptions}
+        onSharePress={handleShare}
+        onReplySubmitSuccess={() => {
+          if (mainTab === 'home' || mainTab === 'profile') {
+            loadTimeline(true);
+          }
+        }}
+        onUserPress={(userId) => {
+          setIsDetailModalVisible(false);
+          setViewingUserId(userId);
+        }}
+      />
+
+      <QuoteComposerModal
+        visible={isQuoteComposerVisible}
+        note={quotingNote}
+        colors={colors}
+        onClose={() => {
+          setIsQuoteComposerVisible(false);
+          setQuotingNote(null);
+        }}
+        onSubmit={handleQuoteSubmit}
+      />
+
+      <RenoteOptionsModal
+        visible={isRenoteOptionsVisible}
+        note={selectedNoteForRenote}
+        colors={colors}
+        onClose={() => {
+          setIsRenoteOptionsVisible(false);
+          setSelectedNoteForRenote(null);
+        }}
+        onRenote={performPureRenote}
+        onQuote={(note) => {
+          setQuotingNote(note);
+          setIsQuoteComposerVisible(true);
+        }}
+      />
+
+      <ReactionPickerModal
+        visible={isReactionPickerVisible}
+        note={selectedNoteForReaction}
+        colors={colors}
+        onClose={() => {
+          setIsReactionPickerVisible(false);
+          setSelectedNoteForReaction(null);
+        }}
+        onSelectReaction={(note, reaction) => {
+          performReaction(note, reaction);
+        }}
+      />
+
+      <ConfirmModal
+        visible={isLogoutConfirmVisible}
+        title="ログアウト"
+        message={`${activeAccount?.displayName || 'このアカウント'} を削除しますか？`}
+        confirmText="ログアウト"
+        isDanger={true}
+        colors={colors}
+        onConfirm={confirmLogout}
+        onClose={() => setIsLogoutConfirmVisible(false)}
+      />
+
+      <Toast
+        visible={toast.visible}
+        title={toast.title}
+        message={toast.message}
+        isError={toast.isError}
+        colors={colors}
+        onHide={() => setToast(prev => ({ ...prev, visible: false }))}
       />
 
       {devMode ? (
