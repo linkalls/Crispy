@@ -112,6 +112,7 @@ function AppContent() {
   const [isNoteComposerVisible, setIsNoteComposerVisible] = useState(false);
   const [toast, setToast] = useState<{ visible: boolean; title: string; message?: string; isError?: boolean }>({ visible: false, title: '' });
   const [isLogoutConfirmVisible, setIsLogoutConfirmVisible] = useState(false);
+  const [viewingUserId, setViewingUserId] = useState<string | null>(null);
   
   const showToast = (title: string, message?: string, isError = false) => {
     setToast({ visible: true, title, message, isError });
@@ -594,7 +595,7 @@ function AppContent() {
         </Pressable>
       </View>
 
-      {mainTab === 'home' && (
+      {!viewingUserId && mainTab === 'home' && (
         <View style={[styles.tabBar, { backgroundColor: colors.tabBg }]}>
           <TabButton label="For You" active={activeTab === 'home'} onPress={() => setActiveTab('home')} colors={colors} />
           <TabButton label="Local" active={activeTab === 'local'} onPress={() => setActiveTab('local')} colors={colors} />
@@ -728,8 +729,9 @@ function AppContent() {
         </SafeAreaView>
       </Modal>
 
-      {mainTab === 'home' && (
+      {!viewingUserId && mainTab === 'home' && (
         <Timeline
+          onUserPress={(userId) => setViewingUserId(userId)}
           notes={notes}
           isLoading={loadingTimeline}
           isRefreshing={refreshing}
@@ -758,13 +760,15 @@ function AppContent() {
           onSharePress={handleShare}
           onReactionPress={handleReactionToggle}
           onNotePress={(note) => {
+            console.log('NOTE PRESSED IN APP.TSX', note.id);
             setSelectedNoteForDetail(note);
             setIsDetailModalVisible(true);
           }}
         />
       )}
-      {mainTab === 'explore' && (
+      {!viewingUserId && mainTab === 'explore' && (
         <ExploreScreen
+          onUserPress={(userId) => setViewingUserId(userId)}
           colors={colors}
           activeAccount={activeAccount}
           misskeyRequest={misskeyRequest}
@@ -784,9 +788,32 @@ function AppContent() {
           onReactionPress={handleReactionToggle}
         />
       )}
-      {mainTab === 'notifications' && <NotificationsScreen colors={colors} activeAccount={activeAccount} misskeyRequest={misskeyRequest} />}
-      {mainTab === 'profile' && (
+      {!viewingUserId && mainTab === 'notifications' && (
+        <NotificationsScreen
+          colors={colors}
+          activeAccount={activeAccount}
+          misskeyRequest={misskeyRequest}
+          onNotificationPress={async (noteId) => {
+            try {
+              if (activeAccount?.token === 'mock_token') return;
+              const noteData = await misskeyRequest<any>('/api/notes/show', { noteId }, true);
+              if (noteData && activeAccount) {
+                const mapped = mapNote(noteData, activeAccount.host);
+                setSelectedNoteForDetail(mapped);
+                setIsDetailModalVisible(true);
+              }
+            } catch (e) {
+              console.error('Failed to fetch note detail for notification', e);
+            }
+          }}
+          onUserPress={(userId) => setViewingUserId(userId)}
+        />
+      )}
+      {(viewingUserId || mainTab === 'profile') && (
         <ProfileScreen
+          viewingUserId={viewingUserId}
+          onBack={viewingUserId ? () => setViewingUserId(null) : undefined}
+          onUserPress={(userId) => setViewingUserId(userId)}
           colors={colors}
           activeAccount={activeAccount}
           misskeyRequest={misskeyRequest}
@@ -795,17 +822,15 @@ function AppContent() {
             setIsDetailModalVisible(true);
           }}
           onReplyPress={(noteOrId) => {
-            // Timeline passes noteId string, ProfileScreen is updated to pass the full note object.
-            // So noteOrId is TimelineNote if from ProfileScreen.
             if (typeof noteOrId === 'object' && noteOrId !== null && 'id' in noteOrId) {
               setSelectedNoteForDetail(noteOrId as any);
               setIsDetailModalVisible(true);
-            } else {
-               const note = notes.find((n) => n.id === noteOrId);
-               if (note) {
-                 setSelectedNoteForDetail(note);
-                 setIsDetailModalVisible(true);
-               }
+            } else if (typeof noteOrId === 'string') {
+              const note = notes.find((n) => n.id === noteOrId);
+              if (note) {
+                setSelectedNoteForDetail(note as any);
+                setIsDetailModalVisible(true);
+              }
             }
           }}
           onRenotePress={handleRenoteOptions}
@@ -814,12 +839,11 @@ function AppContent() {
         />
       )}
 
-
       <NoteDetailModal
         visible={isDetailModalVisible}
         note={selectedNoteForDetail}
         colors={colors}
-        activeAccountHost={activeAccount.host}
+        activeAccountHost={activeAccount?.host || ''}
         misskeyRequest={misskeyRequest}
         onShowToast={showToast}
         onClose={() => {
@@ -830,7 +854,13 @@ function AppContent() {
         onRenotePress={handleRenoteOptions}
         onSharePress={handleShare}
         onReplySubmitSuccess={() => {
-          loadTimeline(true);
+          if (mainTab === 'home' || mainTab === 'profile') {
+            loadTimeline(true);
+          }
+        }}
+        onUserPress={(userId) => {
+          setIsDetailModalVisible(false);
+          setViewingUserId(userId);
         }}
       />
 

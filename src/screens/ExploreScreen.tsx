@@ -14,6 +14,7 @@ export function ExploreScreen({
   onRenotePress,
   onSharePress,
   onReactionPress,
+  onUserPress,
 }: {
   colors: ColorScheme;
   activeAccount: StoredAccount | null;
@@ -23,6 +24,7 @@ export function ExploreScreen({
   onRenotePress: (note: TimelineNote) => void;
   onSharePress: (note: TimelineNote) => void;
   onReactionPress: (noteOrId: string | TimelineNote, index: number) => void;
+  onUserPress?: (userId: string) => void;
 }) {
   const [query, setQuery] = useState('');
   const [notes, setNotes] = useState<TimelineNote[]>([]);
@@ -80,6 +82,7 @@ export function ExploreScreen({
           onRenotePress={onRenotePress}
           onSharePress={onSharePress}
           onReactionPress={onReactionPress}
+          onUserPress={onUserPress}
         />
       ) : searched ? (
         <View style={styles.center}>

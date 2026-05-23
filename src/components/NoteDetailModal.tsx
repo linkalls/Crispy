@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Modal,
-  SafeAreaView,
   View,
   Text,
   TextInput,
@@ -14,6 +13,7 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ColorScheme, TimelineNote, MisskeyNote } from "../utils/types";
 import { MfmRenderer } from "./MfmRenderer";
 import { ReplyComposer } from "./ReplyComposer";
@@ -32,6 +32,7 @@ export function NoteDetailModal({
   onSharePress,
   onReplySubmitSuccess,
   onShowToast,
+  onUserPress,
 }: {
   visible: boolean;
   note: TimelineNote | null;
@@ -44,7 +45,9 @@ export function NoteDetailModal({
   onSharePress: (note: TimelineNote) => void;
   onReplySubmitSuccess: () => void;
   onShowToast: (title: string, msg?: string, isErr?: boolean) => void;
+  onUserPress?: (userId: string) => void;
 }) {
+  const insets = useSafeAreaInsets();
   const [replies, setReplies] = useState<TimelineNote[]>([]);
   const [loadingReplies, setLoadingReplies] = useState(false);
   const [replyText, setReplyText] = useState("");
@@ -122,7 +125,7 @@ export function NoteDetailModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={{ flex: 1 }}
@@ -160,11 +163,15 @@ export function NoteDetailModal({
             {/* 2. Main Note Detailed Card */}
             <View style={[styles.mainNoteCard, { backgroundColor: colors.bg }]}>
               <View style={styles.mainNoteUserRow}>
-                <Image source={{ uri: note.user.avatar }} style={styles.mainNoteAvatar} />
+                <Pressable onPress={() => { if (note.user.id) onUserPress?.(note.user.id); onClose(); }}>
+                  <Image source={{ uri: note.user.avatar }} style={styles.mainNoteAvatar} />
+                </Pressable>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.mainNoteName, { color: colors.text }]}>
-                    {note.user.name}
-                  </Text>
+                  <Pressable onPress={() => { if (note.user.id) onUserPress?.(note.user.id); onClose(); }}>
+                    <Text style={[styles.mainNoteName, { color: colors.text }]}>
+                      {note.user.name}
+                    </Text>
+                  </Pressable>
                   <Text style={[styles.mainNoteMeta, { color: colors.textMuted }]} numberOfLines={1}>
                     @{note.user.username}@{note.user.host}
                   </Text>
@@ -403,7 +410,7 @@ export function NoteDetailModal({
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }

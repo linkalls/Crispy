@@ -35,12 +35,16 @@ type MisskeyNotification = {
     reaction: string;
   }>;
   users?: Array<MisskeyUser>;
+  header?: string;
 };
 
 function getNotificationIcon(type: string): { name: string; color: string } {
   if (type.startsWith('reaction')) return { name: 'heart', color: '#ff6b6b' };
   if (type.startsWith('renote')) return { name: 'repeat', color: '#51cf66' };
   switch (type) {
+    case 'app':
+    case 'login':
+      return { name: 'information-circle', color: '#4dabf7' };
     case 'reply':
       return { name: 'chatbubble', color: '#4dabf7' };
     case 'quote':
@@ -64,6 +68,10 @@ function getNotificationMessage(type: string, reaction?: string): string {
   if (type.startsWith('reaction')) return `${reaction || ''} リアクションしました`;
   if (type.startsWith('renote')) return 'リノートしました';
   switch (type) {
+    case 'app':
+      return 'システムからのお知らせ';
+    case 'login':
+      return '新しいログインがありました';
     case 'reply':
       return '返信しました';
     case 'quote':
@@ -100,10 +108,14 @@ export function NotificationsScreen({
   colors,
   activeAccount,
   misskeyRequest,
+  onNotificationPress,
+  onUserPress,
 }: {
   colors: ColorScheme;
   activeAccount: StoredAccount | null;
   misskeyRequest: <T>(path: string, payload: Record<string, unknown>, requiresAuth?: boolean) => Promise<T>;
+  onNotificationPress?: (noteId: string) => void;
+  onUserPress?: (userId: string) => void;
 }) {
   const [notifications, setNotifications] = useState<MisskeyNotification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -197,7 +209,11 @@ export function NotificationsScreen({
     }
 
     let message = getNotificationMessage(item.type, reactionEmoji);
-    let userName = targetUser?.name || targetUser?.username || '不明';
+    let userName = targetUser?.name || targetUser?.username;
+    if (!userName && item.type.startsWith('app')) {
+      userName = item.header || 'システム通知';
+    }
+    userName = userName || '不明';
     let userHost = targetUser?.host ? `@${targetUser.host}` : '';
     let suffix = '';
 
@@ -210,14 +226,19 @@ export function NotificationsScreen({
     }
 
     return (
-      <View style={[localStyles.notifItem, { borderBottomColor: colors.border }]}>
+      <Pressable
+        style={[localStyles.notifItem, { borderBottomColor: colors.border }]}
+        onPress={() => { if (item.note?.id) onNotificationPress?.(item.note.id); }}
+      >
         <View style={localStyles.iconWrap}>
           <Ionicons name={icon.name as any} size={20} color={icon.color} />
         </View>
-        <Image
-          source={{ uri: targetUser?.avatarUrl || 'https://api.dicebear.com/9.x/avataaars/svg?seed=default' }}
-          style={localStyles.avatar}
-        />
+        <Pressable onPress={() => { if (targetUser?.id) onUserPress?.(targetUser.id); }}>
+          <Image
+            source={{ uri: targetUser?.avatarUrl || 'https://api.dicebear.com/9.x/avataaars/svg?seed=default' }}
+            style={localStyles.avatar}
+          />
+        </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={[localStyles.userName, { color: colors.text }]} numberOfLines={1}>
             {userName}
@@ -231,7 +252,7 @@ export function NotificationsScreen({
           )}
           <Text style={[localStyles.time, { color: colors.textMuted }]}>{timeAgo(item.createdAt)}</Text>
         </View>
-      </View>
+      </Pressable>
     );
   };
 

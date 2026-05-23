@@ -41,25 +41,25 @@ function MfmFunctionNode({ node, children }: { node: any; children: React.ReactN
       inputRange: [0, 1],
       outputRange: ['0deg', '360deg'],
     });
-    return <Animated.View style={{ transform: [{ rotate }] }}><Text>{children}</Text></Animated.View>;
+    return <Animated.View style={{ transform: [{ rotate }] }}><Text>{React.Children.toArray(children)}</Text></Animated.View>;
   }
   if (node.props.name === 'jelly') {
     const scale = anim.interpolate({
       inputRange: [0, 1],
       outputRange: [1, 1.2],
     });
-    return <Animated.View style={{ transform: [{ scale }] }}><Text>{children}</Text></Animated.View>;
+    return <Animated.View style={{ transform: [{ scale }] }}><Text>{React.Children.toArray(children)}</Text></Animated.View>;
   }
   if (node.props.name === 'tada' || node.props.name === 'shake') {
     const rotate = anim.interpolate({
       inputRange: [-1, 0, 1],
       outputRange: ['-10deg', '0deg', '10deg'],
     });
-    return <Animated.View style={{ transform: [{ rotate }] }}><Text>{children}</Text></Animated.View>;
+    return <Animated.View style={{ transform: [{ rotate }] }}><Text>{React.Children.toArray(children)}</Text></Animated.View>;
   }
 
   // フォールバック
-  return <Text>{children}</Text>;
+  return <Text>{React.Children.toArray(children)}</Text>;
 }
 
 export function MfmRenderer({

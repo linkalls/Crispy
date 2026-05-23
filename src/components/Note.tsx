@@ -19,6 +19,7 @@ export function Note({
   onRenotePress,
   onSharePress,
   onReactionPress,
+  onUserPress,
 }: {
   note: TimelineNote;
   isReplying: boolean;
@@ -32,6 +33,7 @@ export function Note({
   onRenotePress: () => void;
   onSharePress: () => void;
   onReactionPress: (index: number) => void;
+  onUserPress?: (userId: string) => void;
 }) {
   return (
     <Pressable
@@ -65,13 +67,27 @@ export function Note({
 
       {/* ノート本体 */}
       <View style={styles.noteRow}>
-        <Image source={{ uri: note.user.avatar }} style={styles.noteAvatar} />
+        <Pressable
+          onPress={(e) => {
+            e.stopPropagation();
+            if (note.user.id) onUserPress?.(note.user.id);
+          }}
+        >
+          <Image source={{ uri: note.user.avatar }} style={styles.noteAvatar} />
+        </Pressable>
         <View style={styles.noteMain}>
           {/* ユーザー情報 */}
           <View style={styles.noteHeaderRow}>
-            <Text style={[styles.noteName, { color: colors.text }]} numberOfLines={1}>
-              {note.user.name}
-            </Text>
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
+                if (note.user.id) onUserPress?.(note.user.id);
+              }}
+            >
+              <Text style={[styles.noteName, { color: colors.text }]} numberOfLines={1}>
+                {note.user.name}
+              </Text>
+            </Pressable>
             <Text style={[styles.noteMeta, { color: colors.textMuted }]} numberOfLines={1}>
               @{note.user.username}@{note.user.host} · {note.createdAtLabel}
             </Text>
