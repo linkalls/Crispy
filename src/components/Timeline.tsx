@@ -36,7 +36,7 @@ export function Timeline({
   onReplySubmit: () => void;
   onRenotePress: (note: TimelineNote) => void;
   onSharePress: (note: TimelineNote) => void;
-  onReactionPress: (noteId: string, index: number) => void;
+  onReactionPress: (note: import('../utils/types').TimelineNote, index: number) => void;
   onNotePress?: (note: TimelineNote) => void;
   onUserPress?: (userId: string) => void;
 }) {
@@ -102,7 +102,7 @@ export function Timeline({
           onReplySubmit={onReplySubmit}
           onRenotePress={() => onRenotePress(note)}
           onSharePress={() => onSharePress(note)}
-          onReactionPress={(index) => onReactionPress(note.id, index)}
+          onReactionPress={(index) => onReactionPress(note, index)}
           onUserPress={onUserPress}
         />
       )}

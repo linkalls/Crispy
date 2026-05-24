@@ -141,6 +141,33 @@ export function ProfileScreen({
     );
   }
 
+
+  const handleReactionPress = (noteOrId: string | TimelineNote, index: number) => {
+    const noteId = typeof noteOrId === 'string' ? noteOrId : noteOrId.id;
+    let note = typeof noteOrId === 'string' ? notes.find(n => n.id === noteId) : noteOrId;
+    if (!note) return;
+
+    if (index !== -1) {
+      const target = note.reactions[index];
+      if (target) {
+        const nextReacted = !target.reacted;
+        setNotes(current =>
+          current.map(item => {
+            if (item.id !== noteId) return item;
+            const reactions = [...item.reactions];
+            reactions[index] = {
+              ...target,
+              reacted: nextReacted,
+              count: Math.max(0, target.count + (nextReacted ? 1 : -1)),
+            };
+            return { ...item, reactions };
+          })
+        );
+      }
+    }
+    if (onReactionPress) onReactionPress(note, index);
+  };
+
   const renderHeader = () => (
     <View>
       {/* Banner */}
@@ -218,7 +245,7 @@ export function ProfileScreen({
       onReplySubmit={() => {}}
       onRenotePress={() => onRenotePress?.(item)}
       onSharePress={() => onSharePress?.(item)}
-      onReactionPress={(index) => onReactionPress?.(item, index)}
+      onReactionPress={(index) => handleReactionPress(item, index)}
       onUserPress={onUserPress}
     />
   );
