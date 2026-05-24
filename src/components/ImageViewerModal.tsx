@@ -1,7 +1,7 @@
 import React from 'react';
-import { Modal, View, Image, Pressable, StyleSheet, SafeAreaView, Platform } from 'react-native';
+import { Modal, View, Image, Pressable, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 
 export interface ImageViewerModalProps {
   visible: boolean;
@@ -23,7 +23,7 @@ export function ImageViewerModal({ visible, imageUrl, onClose }: ImageViewerModa
     >
       <View style={styles.container}>
         <View style={[styles.header, { paddingTop: Platform.OS === 'android' ? insets.top : 0 }]}>
-          <SafeAreaView edges={['top']}>
+          <SafeAreaView>
             <Pressable
               style={({ pressed }) => [styles.closeButton, pressed && styles.closeButtonPressed]}
               onPress={onClose}

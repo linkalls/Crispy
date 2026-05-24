@@ -15,6 +15,7 @@ export function ExploreScreen({
   onSharePress,
   onReactionPress,
   onUserPress,
+  onImagePress,
 }: {
   colors: ColorScheme;
   activeAccount: StoredAccount | null;
@@ -25,6 +26,7 @@ export function ExploreScreen({
   onSharePress: (note: TimelineNote) => void;
   onReactionPress: (noteOrId: string | TimelineNote, index: number) => void;
   onUserPress?: (userId: string) => void;
+  onImagePress?: (url: string) => void;
 }) {
   const [query, setQuery] = useState('');
   const [notes, setNotes] = useState<TimelineNote[]>([]);
@@ -110,6 +112,7 @@ export function ExploreScreen({
           onSharePress={onSharePress}
           onReactionPress={handleReactionPress}
           onUserPress={onUserPress}
+          onImagePress={onImagePress}
         />
       ) : searched ? (
         <View style={styles.center}>

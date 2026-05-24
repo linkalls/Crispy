@@ -20,6 +20,7 @@ export function Note({
   onSharePress,
   onReactionPress,
   onUserPress,
+  onImagePress,
 }: {
   note: TimelineNote;
   isReplying: boolean;
@@ -34,6 +35,7 @@ export function Note({
   onSharePress: () => void;
   onReactionPress: (index: number) => void;
   onUserPress?: (userId: string) => void;
+  onImagePress?: (url: string) => void;
 }) {
   return (
     <Pressable
@@ -105,7 +107,7 @@ export function Note({
                 return (
                   <View key={idx} style={styles.mediaItem}>
                     {isImage || isVideo ? (
-                      <Pressable onPress={() => Linking.openURL(file.url)}>
+                      <Pressable onPress={() => onImagePress ? onImagePress(file.url) : Linking.openURL(file.url)}>
                         <Image
                           source={{ uri: file.thumbnailUrl || file.url }}
                           style={styles.mediaImage}
@@ -151,7 +153,7 @@ export function Note({
                     return (
                       <View key={idx} style={styles.quoteMediaItem}>
                         {isImage || isVideo ? (
-                          <Pressable onPress={() => Linking.openURL(file.url)}>
+                          <Pressable onPress={() => onImagePress ? onImagePress(file.url) : Linking.openURL(file.url)}>
                             <Image
                               source={{ uri: file.thumbnailUrl || file.url }}
                               style={styles.quoteMediaImage}

@@ -35,6 +35,7 @@ import {
   BottomNavigation,
   FAB,
   NoteComposerModal,
+  ImageViewerModal,
 } from './src/components';
 import { NotificationsScreen, ExploreScreen, ProfileScreen } from './src/screens';
 import { useMisskey, useMisskeyStream } from './src/hooks';
@@ -117,6 +118,8 @@ function AppContent() {
   const [toast, setToast] = useState<{ visible: boolean; title: string; message?: string; isError?: boolean }>({ visible: false, title: '' });
   const [isLogoutConfirmVisible, setIsLogoutConfirmVisible] = useState(false);
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
+  const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   
   const showToast = (title: string, message?: string, isError = false) => {
     setToast({ visible: true, title, message, isError });
@@ -479,6 +482,11 @@ function AppContent() {
     }
   };
 
+  const handleImagePress = (url: string) => {
+    setPreviewImageUrl(url);
+    setIsImageViewerVisible(true);
+  };
+
   const handleShare = async (note: TimelineNote) => {
     const noteUrl = `https://${note.user.host}/notes/${note.targetId}`;
     try {
@@ -780,6 +788,7 @@ function AppContent() {
           onRenotePress={handleRenoteOptions}
           onSharePress={handleShare}
           onReactionPress={handleReactionToggle}
+          onImagePress={handleImagePress}
           onNotePress={(note) => {
             console.log('NOTE PRESSED IN APP.TSX', note.id);
             setSelectedNoteForDetail(note);
@@ -807,6 +816,7 @@ function AppContent() {
           onRenotePress={handleRenoteOptions}
           onSharePress={handleShare}
           onReactionPress={handleReactionToggle}
+          onImagePress={handleImagePress}
         />
       )}
       {!viewingUserId && mainTab === 'notifications' && (
@@ -857,6 +867,7 @@ function AppContent() {
           onRenotePress={handleRenoteOptions}
           onSharePress={handleShare}
           onReactionPress={handleReactionToggle}
+          onImagePress={handleImagePress}
         />
       )}
 
@@ -887,6 +898,7 @@ function AppContent() {
           setIsDetailModalVisible(false);
           setViewingUserId(userId);
         }}
+        onImagePress={handleImagePress}
       />
 
       <QuoteComposerModal
@@ -977,6 +989,15 @@ function AppContent() {
       )}
       
       <BottomNavigation activeTab={mainTab} onTabChange={(tab) => { setMainTab(tab); setViewingUserId(null); }} colors={colors} />
+
+      <ImageViewerModal
+        visible={isImageViewerVisible}
+        imageUrl={previewImageUrl}
+        onClose={() => {
+          setIsImageViewerVisible(false);
+          setPreviewImageUrl(null);
+        }}
+      />
 
       <NoteComposerModal
         visible={isNoteComposerVisible}

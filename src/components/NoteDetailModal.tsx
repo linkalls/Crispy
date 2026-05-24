@@ -34,6 +34,7 @@ export function NoteDetailModal({
   onReplySubmitSuccess,
   onShowToast,
   onUserPress,
+  onImagePress,
 }: {
   visible: boolean;
   note: TimelineNote | null;
@@ -48,6 +49,7 @@ export function NoteDetailModal({
   onReplySubmitSuccess: () => void;
   onShowToast: (title: string, msg?: string, isErr?: boolean) => void;
   onUserPress?: (userId: string) => void;
+  onImagePress?: (url: string) => void;
 }) {
   const insets = useSafeAreaInsets();
   const [replies, setReplies] = useState<TimelineNote[]>([]);
@@ -192,11 +194,13 @@ export function NoteDetailModal({
                     return (
                       <View key={idx} style={styles.mainNoteMediaItem}>
                         {isImage || isVideo ? (
-                          <Image
-                            source={{ uri: file.thumbnailUrl || file.url }}
-                            style={styles.mainNoteMediaImage}
-                            resizeMode="cover"
-                          />
+                          <Pressable onPress={() => onImagePress ? onImagePress(file.url) : undefined}>
+                            <Image
+                              source={{ uri: file.thumbnailUrl || file.url }}
+                              style={styles.mainNoteMediaImage}
+                              resizeMode="cover"
+                            />
+                          </Pressable>
                         ) : (
                           <View style={[styles.mainNoteMediaFile, { backgroundColor: colors.reactionBg }]}>
                             <Ionicons name="document-outline" size={32} color={colors.textMuted} />
@@ -349,11 +353,13 @@ export function NoteDetailModal({
                               return (
                                 <View key={fIdx} style={styles.replyMediaItem}>
                                   {isImage || isVideo ? (
-                                    <Image
-                                      source={{ uri: file.thumbnailUrl || file.url }}
-                                      style={styles.replyMediaImage}
-                                      resizeMode="cover"
-                                    />
+                                    <Pressable onPress={() => onImagePress ? onImagePress(file.url) : undefined}>
+                                      <Image
+                                        source={{ uri: file.thumbnailUrl || file.url }}
+                                        style={styles.replyMediaImage}
+                                        resizeMode="cover"
+                                      />
+                                    </Pressable>
                                   ) : (
                                     <View style={[styles.replyMediaFile, { backgroundColor: colors.reactionBg }]}>
                                       <Ionicons name="document-outline" size={14} color={colors.textMuted} />
