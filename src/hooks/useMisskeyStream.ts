@@ -20,21 +20,25 @@ export function useMisskeyStream(activeAccount: StoredAccount | null) {
       console.log('[Stream] WebSocket connected');
       setIsConnected(true);
       
-      // ホームタイムラインに接続
       ws.send(JSON.stringify({
         type: 'connect',
-        body: {
-          channel: 'homeTimeline',
-          id: 'home'
-        }
+        body: { channel: 'homeTimeline', id: 'home' }
+      }));
+      ws.send(JSON.stringify({
+        type: 'connect',
+        body: { channel: 'localTimeline', id: 'local' }
+      }));
+      ws.send(JSON.stringify({
+        type: 'connect',
+        body: { channel: 'globalTimeline', id: 'global' }
       }));
     };
 
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
-        if (msg.type === 'channel' && msg.body.id === 'home' && msg.body.type === 'note') {
-          setLastMessage(msg.body.body);
+        if (msg.type === 'channel' && ['home', 'local', 'global'].includes(msg.body.id) && msg.body.type === 'note') {
+          setLastMessage({ channelId: msg.body.id, note: msg.body.body });
         }
       } catch (e) {
         console.error('[Stream] Parse error', e);

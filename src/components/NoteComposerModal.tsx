@@ -82,7 +82,8 @@ export function NoteComposerModal({
         type,
       } as any);
 
-      const response = await fetch(`https://${activeAccount.host}/api/drive/files/create`, {
+      const hostUrl = activeAccount.host.replace(/\/+$/, '');
+      const response = await fetch(`https://${hostUrl}/api/drive/files/create`, {
         method: 'POST',
         body: formData,
       });

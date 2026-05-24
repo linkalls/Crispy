@@ -109,13 +109,34 @@ export function useMisskey(activeAccount: StoredAccount | null) {
         throw new Error("認証が必要です。");
       }
 
+      const hostUrl = activeAccount.host.replace(/\/+$/, '');
       const cli = new mk.api.APIClient({
-        origin: `https://${activeAccount.host}`,
+        origin: `https://${hostUrl}`,
         credential: activeAccount.token || undefined
       });
 
       const endpoint = path.replace(/^\/api\//, '');
-      const result = await cli.request(endpoint as any, payload as any);
+      // mk.api.APIClient falls back to GET if the endpoint is not registered in endpointReqTypes (which includes 'notes/local-timeline').
+      // To strictly use POST for all Misskey APIs, we bypass this issue by explicitly hitting the endpoint using fetch with POST if needed,
+      // or relying on our endpoint stripping. However, since misskey-js's `request` method has this bug, we use a custom POST call for missing endpoints.
+      const method = endpoint.startsWith('drive/files/') ? 'multipart/form-data' : 'application/json';
+      let result;
+      try {
+        result = await cli.request(endpoint as any, payload as any);
+      } catch (e: any) {
+        if (e.message?.includes('Cannot GET')) {
+          // Fallback manual POST request if misskey-js made a GET request incorrectly
+          const res = await fetch(`https://${hostUrl}/api/${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...payload, i: activeAccount.token })
+          });
+          if (!res.ok) throw new Error(`API Error: ${res.status}`);
+          result = await res.json();
+        } else {
+          throw e;
+        }
+      }
       return (result || {}) as T;
     },
     [activeAccount],

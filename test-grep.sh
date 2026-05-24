@@ -1,0 +1,5 @@
+grep -rn "WebBrowser" src/ || echo "Not found WebBrowser"
+grep -rn "websocket" src/ || echo "Not found websocket"
+grep -rn "WebSocket" src/ || echo "Not found WebSocket"
+grep -rn "misskeyRequest" src/screens/ || echo "Not found in screens"
+grep -rn "Following" src/ || echo "Not found Following"
