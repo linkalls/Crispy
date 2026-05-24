@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as mfm from 'mfm-js';
-import { Image, Pressable, Text, View } from 'react-native';
+import { Image, Pressable, Text, View, Linking } from 'react-native';
 import { styles } from '../styles/styles';
 import { ColorScheme, TimelineNote } from '../utils/types';
 import { MfmRenderer } from './MfmRenderer';
@@ -105,11 +105,13 @@ export function Note({
                 return (
                   <View key={idx} style={styles.mediaItem}>
                     {isImage || isVideo ? (
-                      <Image
-                        source={{ uri: file.thumbnailUrl || file.url }}
-                        style={styles.mediaImage}
-                        resizeMode="cover"
-                      />
+                      <Pressable onPress={() => Linking.openURL(file.url)}>
+                        <Image
+                          source={{ uri: file.thumbnailUrl || file.url }}
+                          style={styles.mediaImage}
+                          resizeMode="cover"
+                        />
+                      </Pressable>
                     ) : (
                       <View style={[styles.mediaFile, { backgroundColor: colors.reactionBg }]}>
                         <Ionicons name="document-outline" size={24} color={colors.textMuted} />
@@ -149,11 +151,13 @@ export function Note({
                     return (
                       <View key={idx} style={styles.quoteMediaItem}>
                         {isImage || isVideo ? (
-                          <Image
-                            source={{ uri: file.thumbnailUrl || file.url }}
-                            style={styles.quoteMediaImage}
-                            resizeMode="cover"
-                          />
+                          <Pressable onPress={() => Linking.openURL(file.url)}>
+                            <Image
+                              source={{ uri: file.thumbnailUrl || file.url }}
+                              style={styles.quoteMediaImage}
+                              resizeMode="cover"
+                            />
+                          </Pressable>
                         ) : (
                           <View style={[styles.quoteMediaFile, { backgroundColor: colors.reactionBg }]}>
                             <Ionicons name="document-outline" size={14} color={colors.textMuted} />

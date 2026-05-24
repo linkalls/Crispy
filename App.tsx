@@ -39,6 +39,7 @@ import {
 import { NotificationsScreen, ExploreScreen, ProfileScreen } from './src/screens';
 import { useMisskey, useMisskeyStream } from './src/hooks';
 import { styles } from './src/styles/styles';
+import { ReactionListModal } from "./src/components/ReactionListModal";
 import { darkColors, lightColors } from './src/utils/colors';
 import {
   DEFAULT_HOST,
@@ -110,6 +111,8 @@ function AppContent() {
   const [isRenoteOptionsVisible, setIsRenoteOptionsVisible] = useState(false);
   const [selectedNoteForReaction, setSelectedNoteForReaction] = useState<TimelineNote | null>(null);
   const [isReactionPickerVisible, setIsReactionPickerVisible] = useState(false);
+  const [isReactionListVisible, setIsReactionListVisible] = useState(false);
+  const [selectedNoteForReactionList, setSelectedNoteForReactionList] = useState<TimelineNote | null>(null);
   const [isNoteComposerVisible, setIsNoteComposerVisible] = useState(false);
   const [toast, setToast] = useState<{ visible: boolean; title: string; message?: string; isError?: boolean }>({ visible: false, title: '' });
   const [isLogoutConfirmVisible, setIsLogoutConfirmVisible] = useState(false);
@@ -163,12 +166,14 @@ function AppContent() {
   const { isConnected, lastMessage } = useMisskeyStream(activeAccount);
 
   useEffect(() => {
-    if (lastMessage && mainTab === 'home' && activeTab === 'home') {
-      setNotes((prev) => {
-        const exists = prev.find(n => n.id === lastMessage.id);
-        if (exists) return prev;
-        return [mapNote(lastMessage, activeAccount?.host || DEFAULT_HOST), ...prev];
-      });
+    if (lastMessage && mainTab === 'home') {
+      if (lastMessage.channelId === activeTab) {
+        setNotes((prev) => {
+          const exists = prev.find(n => n.id === lastMessage.note.id);
+          if (exists) return prev;
+          return [mapNote(lastMessage.note, activeAccount?.host || DEFAULT_HOST), ...prev];
+        });
+      }
     }
   }, [lastMessage, activeAccount?.host, mainTab, activeTab]);
 
@@ -239,7 +244,7 @@ function AppContent() {
     const hadActiveAccount = Boolean(activeAccountId);
     try {
       setOauthLoading(true);
-      const checkResponse = await fetch(`https://${host}/api/miauth/${session}/check`, {
+      const checkResponse = await fetch(`https://${host.replace(/\/+$/, '')}/api/miauth/${session}/check`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -867,6 +872,10 @@ function AppContent() {
           setSelectedNoteForDetail(null);
         }}
         onReactionPress={handleReactionToggle}
+        onReactionListPress={(note) => {
+          setSelectedNoteForReactionList(note);
+          setIsReactionListVisible(true);
+        }}
         onRenotePress={handleRenoteOptions}
         onSharePress={handleShare}
         onReplySubmitSuccess={() => {
@@ -916,6 +925,17 @@ function AppContent() {
         }}
         onSelectReaction={(note, reaction) => {
           performReaction(note, reaction);
+        }}
+      />
+
+      <ReactionListModal
+        visible={isReactionListVisible}
+        note={selectedNoteForReactionList}
+        colors={colors}
+        misskeyRequest={misskeyRequest}
+        onClose={() => {
+          setIsReactionListVisible(false);
+          setSelectedNoteForReactionList(null);
         }}
       />
 

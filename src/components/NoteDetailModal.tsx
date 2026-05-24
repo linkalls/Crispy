@@ -28,6 +28,7 @@ export function NoteDetailModal({
   misskeyRequest,
   onClose,
   onReactionPress,
+  onReactionListPress,
   onRenotePress,
   onSharePress,
   onReplySubmitSuccess,
@@ -41,6 +42,7 @@ export function NoteDetailModal({
   misskeyRequest: <T>(path: string, payload: Record<string, unknown>, requiresAuth?: boolean) => Promise<T>;
   onClose: () => void;
   onReactionPress: (noteOrId: string | TimelineNote, reactionIndex: number) => Promise<void>;
+  onReactionListPress?: (note: TimelineNote) => void;
   onRenotePress: (note: TimelineNote) => void;
   onSharePress: (note: TimelineNote) => void;
   onReplySubmitSuccess: () => void;
