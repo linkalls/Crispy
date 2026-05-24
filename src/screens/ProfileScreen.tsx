@@ -10,7 +10,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { ColorScheme, StoredAccount, TimelineNote } from '../utils/types';
+import { ColorScheme, StoredAccount, TimelineNote, ProfileTab, MisskeyUser } from '../utils/types';
 import { mapNote } from '../utils/formatting';
 import { Note } from '../components/Note';
 
@@ -30,6 +30,7 @@ type UserProfile = {
 
 export function ProfileScreen({
   colors,
+  onImagePress,
   activeAccount,
   misskeyRequest,
   onNotePress,
@@ -52,11 +53,15 @@ export function ProfileScreen({
   viewingUserId?: string | null;
   onBack?: () => void;
   onUserPress?: (userId: string) => void;
+  onImagePress?: (urls: string[], index: number) => void;
 }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [notes, setNotes] = useState<TimelineNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<ProfileTab>('notes');
+  const [follows, setFollows] = useState<any[]>([]);
+  const [followers, setFollowers] = useState<any[]>([]);
 
   const loadProfile = useCallback(async (isRefresh = false) => {
     if (!activeAccount) return;
@@ -114,12 +119,16 @@ export function ProfileScreen({
         ]);
       } else {
         const targetUserId = viewingUserId || activeAccount.userId;
-        const [userInfo, userNotes] = await Promise.all([
+const [userInfo, userNotes, userFollowers, userFollowing] = await Promise.all([
           misskeyRequest<UserProfile>('/api/users/show', { userId: targetUserId }, true),
           misskeyRequest<any[]>('/api/users/notes', { userId: targetUserId, limit: 20 }, true),
+          misskeyRequest<any[]>('/api/users/followers', { userId: targetUserId, limit: 20 }, true),
+          misskeyRequest<any[]>('/api/users/following', { userId: targetUserId, limit: 20 }, true),
         ]);
         setProfile(userInfo);
         setNotes(userNotes.map((n) => mapNote(n, activeAccount.host)));
+        setFollowers(userFollowers);
+        setFollows(userFollowing);
       }
     } catch (e) {
       console.error('Failed to load profile:', e);
@@ -203,7 +212,7 @@ export function ProfileScreen({
         </Text>
 
         {profile?.description && (
-          <Text style={[localStyles.bio, { color: colors.text }]}>
+          <Text style={[localStyles.description, { color: colors.text }]}>
             {profile.description}
           </Text>
         )}
@@ -211,15 +220,15 @@ export function ProfileScreen({
         {/* Stats */}
         <View style={localStyles.statsRow}>
           <View style={localStyles.statItem}>
-            <Text style={[localStyles.statNumber, { color: colors.text }]}>{profile?.followingCount ?? 0}</Text>
+            <Text style={[localStyles.statCount, { color: colors.text }]}>{profile?.followingCount ?? 0}</Text>
             <Text style={[localStyles.statLabel, { color: colors.textMuted }]}>フォロー</Text>
           </View>
           <View style={localStyles.statItem}>
-            <Text style={[localStyles.statNumber, { color: colors.text }]}>{profile?.followersCount ?? 0}</Text>
+            <Text style={[localStyles.statCount, { color: colors.text }]}>{profile?.followersCount ?? 0}</Text>
             <Text style={[localStyles.statLabel, { color: colors.textMuted }]}>フォロワー</Text>
           </View>
           <View style={localStyles.statItem}>
-            <Text style={[localStyles.statNumber, { color: colors.text }]}>{profile?.notesCount ?? 0}</Text>
+            <Text style={[localStyles.statCount, { color: colors.text }]}>{profile?.notesCount ?? 0}</Text>
             <Text style={[localStyles.statLabel, { color: colors.textMuted }]}>ノート</Text>
           </View>
         </View>
@@ -229,32 +238,61 @@ export function ProfileScreen({
 
         <Text style={[localStyles.sectionTitle, { color: colors.text }]}>投稿</Text>
       </View>
+
+      <View style={localStyles.tabContainer}>
+        <Pressable onPress={() => setActiveTab('notes')} style={[localStyles.tabButton, activeTab === 'notes' && localStyles.activeTabButton, activeTab === 'notes' && { borderBottomColor: colors.primary }]}>
+          <Text style={[localStyles.tabText, { color: activeTab === 'notes' ? colors.primary : colors.textMuted }]}>ノート</Text>
+        </Pressable>
+        <Pressable onPress={() => setActiveTab('follows')} style={[localStyles.tabButton, activeTab === 'follows' && localStyles.activeTabButton, activeTab === 'follows' && { borderBottomColor: colors.primary }]}>
+          <Text style={[localStyles.tabText, { color: activeTab === 'follows' ? colors.primary : colors.textMuted }]}>フォロー</Text>
+        </Pressable>
+        <Pressable onPress={() => setActiveTab('followers')} style={[localStyles.tabButton, activeTab === 'followers' && localStyles.activeTabButton, activeTab === 'followers' && { borderBottomColor: colors.primary }]}>
+          <Text style={[localStyles.tabText, { color: activeTab === 'followers' ? colors.primary : colors.textMuted }]}>フォロワー</Text>
+        </Pressable>
+      </View>
     </View>
   );
 
-  const renderNote = ({ item }: { item: TimelineNote }) => (
-    <Note
-      note={item}
-      isReplying={false}
-      replyText=""
-      isSendingReply={false}
-      colors={colors}
-      onPress={() => onNotePress?.(item)}
-      onReplyPress={() => onReplyPress?.(item)}
-      onReplyTextChange={() => {}}
-      onReplySubmit={() => {}}
-      onRenotePress={() => onRenotePress?.(item)}
-      onSharePress={() => onSharePress?.(item)}
-      onReactionPress={(index) => handleReactionPress(item, index)}
-      onUserPress={onUserPress}
-    />
-  );
+  const renderItem = ({ item }: { item: any }) => {
+    if (activeTab === 'notes') {
+      return (
+        <Note
+          note={item as TimelineNote}
+          isReplying={false}
+          replyText=""
+          isSendingReply={false}
+          colors={colors}
+          onPress={() => onNotePress?.(item as TimelineNote)}
+          onReplyPress={() => onReplyPress?.(item as TimelineNote)}
+          onReplyTextChange={() => {}}
+          onReplySubmit={() => {}}
+          onRenotePress={() => onRenotePress?.(item as TimelineNote)}
+          onSharePress={() => onSharePress?.(item as TimelineNote)}
+          onReactionPress={(index) => handleReactionPress(item.id, index)}
+          onUserPress={onUserPress}
+          onImagePress={onImagePress}
+        />
+      );
+    }
+
+    const user = activeTab === 'follows' ? item.followee : item.follower;
+    if (!user) return null;
+    return (
+      <Pressable style={[localStyles.userCard, { borderBottomColor: colors.border }]} onPress={() => onUserPress?.(user.id)}>
+        <Image source={{ uri: user.avatarUrl || 'https://api.dicebear.com/9.x/avataaars/svg?seed=default' }} style={localStyles.userAvatar} />
+        <View style={localStyles.userInfo}>
+          <Text style={[localStyles.userName, { color: colors.text }]} numberOfLines={1}>{user.name || user.username}</Text>
+          <Text style={[localStyles.userMeta, { color: colors.textMuted }]} numberOfLines={1}>@{user.username}{user.host ? `@${user.host}` : ''}</Text>
+        </View>
+      </Pressable>
+    );
+  };
 
   return (
     <FlatList
-      data={notes}
+      data={activeTab === 'notes' ? notes : (activeTab === 'follows' ? follows : followers)}
       keyExtractor={(item) => item.id}
-      renderItem={renderNote}
+      renderItem={renderItem}
       ListHeaderComponent={renderHeader}
       style={{ flex: 1, backgroundColor: colors.bg }}
       contentContainerStyle={{ paddingBottom: 20 }}
@@ -269,6 +307,9 @@ export function ProfileScreen({
     />
   );
 }
+
+
+
 
 const localStyles = StyleSheet.create({
   bannerWrap: {
@@ -308,58 +349,83 @@ const localStyles = StyleSheet.create({
   },
   displayName: {
     fontSize: 22,
-    fontWeight: '700',
+    fontWeight: 'bold',
   },
   username: {
-    fontSize: 14,
+    fontSize: 16,
     marginTop: 2,
   },
-  bio: {
+  descriptionWrap: {
+    marginTop: 12,
+  },
+  description: {
     fontSize: 15,
     lineHeight: 22,
-    marginTop: 12,
   },
   statsRow: {
     flexDirection: 'row',
-    gap: 24,
     marginTop: 16,
+    gap: 16,
   },
   statItem: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'baseline',
     gap: 4,
   },
-  statNumber: {
-    fontSize: 16,
-    fontWeight: '700',
+  statCount: {
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   statLabel: {
     fontSize: 14,
   },
   divider: {
     height: 1,
-    marginTop: 20,
-    marginBottom: 12,
+    marginTop: 16,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: 'bold',
     marginBottom: 8,
   },
-  noteCard: {
-    marginHorizontal: 16,
-    marginBottom: 10,
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  reactionChip: {
+  tabContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-    borderWidth: 1,
+    marginTop: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
   },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  activeTabButton: {
+    borderBottomWidth: 2,
+  },
+  tabText: {
+    fontWeight: 'bold',
+  },
+  userCard: {
+    flexDirection: 'row',
+    padding: 16,
+    borderBottomWidth: 1,
+    alignItems: 'center',
+  },
+  userAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+  userMeta: {
+    fontSize: 13,
+  }
 });

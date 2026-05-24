@@ -34,6 +34,7 @@ import {
   BottomNavigation,
   FAB,
   NoteComposerModal,
+  ImageViewerModal,
 } from './src/components';
 import { NotificationsScreen, ExploreScreen, ProfileScreen } from './src/screens';
 import { useMisskey, useMisskeyStream } from './src/hooks';
@@ -75,6 +76,8 @@ function AppContent() {
   const [hydrated, setHydrated] = useState(false);
   const [accounts, setAccounts] = useState<StoredAccount[]>([]);
   const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
+
+
   const [devMode, setDevMode] = useState(false);
   const [themeMode, setThemeMode] = useState<'system' | 'light' | 'dark'>('system');
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
@@ -110,6 +113,8 @@ function AppContent() {
   const [selectedNoteForReaction, setSelectedNoteForReaction] = useState<TimelineNote | null>(null);
   const [isReactionPickerVisible, setIsReactionPickerVisible] = useState(false);
   const [isNoteComposerVisible, setIsNoteComposerVisible] = useState(false);
+  const [imageViewerUrls, setImageViewerUrls] = useState<string[]>([]);
+  const [imageViewerIndex, setImageViewerIndex] = useState(0);
   const [toast, setToast] = useState<{ visible: boolean; title: string; message?: string; isError?: boolean }>({ visible: false, title: '' });
   const [isLogoutConfirmVisible, setIsLogoutConfirmVisible] = useState(false);
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
@@ -159,7 +164,7 @@ function AppContent() {
   );
 
   const { misskeyRequest } = useMisskey(activeAccount);
-  const { isConnected, lastMessage } = useMisskeyStream(activeAccount);
+  const { isConnected, lastMessage } = useMisskeyStream(activeAccount, activeTab);
 
   useEffect(() => {
     if (lastMessage && mainTab === 'home' && activeTab === 'home') {
@@ -564,7 +569,14 @@ function AppContent() {
             初回起動時にサーバーを入力し、OAuth(MiAuth) でログインします。
           </Text>
         </View>
-      </SafeAreaView>
+
+      <ImageViewerModal
+        visible={imageViewerUrls.length > 0}
+        imageUrls={imageViewerUrls}
+        initialIndex={imageViewerIndex}
+        onClose={() => setImageViewerUrls([])}
+      />
+    </SafeAreaView>
     );
   }
 
@@ -726,7 +738,14 @@ function AppContent() {
               <Text style={styles.logoutBtnText}>@ {activeAccount.username} をログアウト</Text>
             </Pressable>
           </View>
-        </SafeAreaView>
+
+      <ImageViewerModal
+        visible={imageViewerUrls.length > 0}
+        imageUrls={imageViewerUrls}
+        initialIndex={imageViewerIndex}
+        onClose={() => setImageViewerUrls([])}
+      />
+    </SafeAreaView>
       </Modal>
 
       {!viewingUserId && mainTab === 'home' && (
@@ -759,6 +778,7 @@ function AppContent() {
           onRenotePress={handleRenoteOptions}
           onSharePress={handleShare}
           onReactionPress={handleReactionToggle}
+          onImagePress={(urls, index) => { setImageViewerUrls(urls); setImageViewerIndex(index); }}
           onNotePress={(note) => {
             console.log('NOTE PRESSED IN APP.TSX', note.id);
             setSelectedNoteForDetail(note);
@@ -786,6 +806,7 @@ function AppContent() {
           onRenotePress={handleRenoteOptions}
           onSharePress={handleShare}
           onReactionPress={handleReactionToggle}
+          onImagePress={(urls, index) => { setImageViewerUrls(urls); setImageViewerIndex(index); }}
         />
       )}
       {!viewingUserId && mainTab === 'notifications' && (
@@ -836,6 +857,7 @@ function AppContent() {
           onRenotePress={handleRenoteOptions}
           onSharePress={handleShare}
           onReactionPress={handleReactionToggle}
+          onImagePress={(urls, index) => { setImageViewerUrls(urls); setImageViewerIndex(index); }}
         />
       )}
 
@@ -858,6 +880,7 @@ function AppContent() {
             loadTimeline(true);
           }
         }}
+        onImagePress={(urls, index) => { setImageViewerUrls(urls); setImageViewerIndex(index); }}
         onUserPress={(userId) => {
           setIsDetailModalVisible(false);
           setViewingUserId(userId);
@@ -955,6 +978,13 @@ function AppContent() {
             showToast('投稿に失敗しました', undefined, true);
           }
         }}
+      />
+
+      <ImageViewerModal
+        visible={imageViewerUrls.length > 0}
+        imageUrls={imageViewerUrls}
+        initialIndex={imageViewerIndex}
+        onClose={() => setImageViewerUrls([])}
       />
     </SafeAreaView>
   );

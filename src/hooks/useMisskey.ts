@@ -1,3 +1,4 @@
+import * as mk from "misskey-js";
 import { useCallback } from "react";
 import { StoredAccount } from "../utils/types";
 
@@ -12,7 +13,7 @@ export function useMisskey(activeAccount: StoredAccount | null) {
         throw new Error("先にログインしてください。");
       }
 
-      if (activeAccount.token === 'mock_token') {
+      if (activeAccount.host === 'mock') {
         if (path === '/api/notes/children') {
           return [
             {
@@ -109,24 +110,22 @@ export function useMisskey(activeAccount: StoredAccount | null) {
       }
 
 
-      const response = await fetch(`https://${activeAccount.host}${path}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(activeAccount.token ? { ...payload, i: activeAccount.token } : payload),
+      const client = new mk.api.APIClient({
+        origin: `https://${activeAccount.host}`,
+        credential: activeAccount.token || undefined,
       });
 
-      if (!response.ok) {
-        throw new Error(`Misskey API error: ${response.status}`);
-      }
+      try {
+        const cleanPath = path.replace(/^\/api\//, '');
+        // For endpoints that require notes/reactions/delete we must only send noteId
+        const isReactionDelete = cleanPath === 'notes/reactions/delete';
+        const finalPayload = isReactionDelete ? { noteId: payload.noteId } : payload;
 
-      if (response.status === 204) {
-        return {} as T;
+        const response = await client.request(cleanPath as any, finalPayload as any);
+        return response as T;
+      } catch (error: any) {
+        throw new Error(`Misskey API error: ${error.message || error}`);
       }
-
-      const text = await response.text();
-      return (text ? JSON.parse(text) : {}) as T;
     },
     [activeAccount],
   );

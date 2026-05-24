@@ -1,70 +1,66 @@
+import * as mk from 'misskey-js';
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { StoredAccount } from '../utils/types';
+import { StoredAccount, TimelineTab } from '../utils/types';
 
-export function useMisskeyStream(activeAccount: StoredAccount | null) {
-  const wsRef = useRef<WebSocket | null>(null);
+export function useMisskeyStream(activeAccount: StoredAccount | null, activeTab: TimelineTab) {
+  const streamRef = useRef<mk.Stream | null>(null);
+  const connectionRef = useRef<any | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<any>(null);
 
   const connect = useCallback(() => {
     if (!activeAccount || !activeAccount.token || activeAccount.token === 'mock_token') return;
     
-    // 既存の接続があれば閉じる
-    if (wsRef.current) {
-      wsRef.current.close();
+    if (connectionRef.current) {
+      connectionRef.current.dispose();
+      connectionRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.close();
+      streamRef.current = null;
     }
 
-    const ws = new WebSocket(`wss://${activeAccount.host}/streaming?i=${activeAccount.token}`);
-    
-    ws.onopen = () => {
-      console.log('[Stream] WebSocket connected');
-      setIsConnected(true);
-      
-      // ホームタイムラインに接続
-      ws.send(JSON.stringify({
-        type: 'connect',
-        body: {
-          channel: 'homeTimeline',
-          id: 'home'
-        }
-      }));
-    };
+    try {
+      const stream = new mk.Stream(`https://${activeAccount.host}`, {
+        token: activeAccount.token
+      });
+      streamRef.current = stream;
 
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data);
-        if (msg.type === 'channel' && msg.body.id === 'home' && msg.body.type === 'note') {
-          setLastMessage(msg.body.body);
-        }
-      } catch (e) {
-        console.error('[Stream] Parse error', e);
-      }
-    };
+      stream.on('_connected_', () => {
+        console.log('[Stream] connected');
+        setIsConnected(true);
+      });
 
-    ws.onclose = () => {
-      console.log('[Stream] WebSocket closed');
-      setIsConnected(false);
-      // 再接続（10秒後）
-      setTimeout(() => {
-        if (wsRef.current === ws) {
-          connect();
-        }
-      }, 10000);
-    };
+      stream.on('_disconnected_', () => {
+        console.log('[Stream] disconnected');
+        setIsConnected(false);
+      });
 
-    ws.onerror = (e) => {
-      console.error('[Stream] WebSocket error', e);
-    };
+      const channelMap: Record<TimelineTab, "homeTimeline" | "localTimeline" | "globalTimeline"> = {
+        home: "homeTimeline",
+        local: "localTimeline",
+        global: "globalTimeline"
+      };
 
-    wsRef.current = ws;
-  }, [activeAccount]);
+      const conn = stream.useChannel(channelMap[activeTab]);
+      conn.on('note', (note: any) => {
+        setLastMessage(note);
+      });
+
+      connectionRef.current = conn as any;
+    } catch (e) {
+      console.error('[Stream] Error initializing', e);
+    }
+  }, [activeAccount, activeTab]);
 
   useEffect(() => {
     connect();
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
+      if (connectionRef.current) {
+        connectionRef.current.dispose();
+      }
+      if (streamRef.current) {
+        streamRef.current.close();
       }
     };
   }, [connect]);

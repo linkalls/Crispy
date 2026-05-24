@@ -112,3 +112,5 @@ export type ColorScheme = {
   reactionActiveBg: string;
   reactionActiveBorder: string;
 };
+
+export type ProfileTab = 'notes' | 'follows' | 'followers';
