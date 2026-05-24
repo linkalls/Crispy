@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { StoredAccount } from "../utils/types";
+import * as mk from 'misskey-js';
 
 export function useMisskey(activeAccount: StoredAccount | null) {
   const misskeyRequest = useCallback(
@@ -108,25 +109,14 @@ export function useMisskey(activeAccount: StoredAccount | null) {
         throw new Error("認証が必要です。");
       }
 
-
-      const response = await fetch(`https://${activeAccount.host}${path}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(activeAccount.token ? { ...payload, i: activeAccount.token } : payload),
+      const cli = new mk.api.APIClient({
+        origin: `https://${activeAccount.host}`,
+        credential: activeAccount.token || undefined
       });
 
-      if (!response.ok) {
-        throw new Error(`Misskey API error: ${response.status}`);
-      }
-
-      if (response.status === 204) {
-        return {} as T;
-      }
-
-      const text = await response.text();
-      return (text ? JSON.parse(text) : {}) as T;
+      const endpoint = path.replace(/^\/api\//, '');
+      const result = await cli.request(endpoint as any, payload as any);
+      return (result || {}) as T;
     },
     [activeAccount],
   );

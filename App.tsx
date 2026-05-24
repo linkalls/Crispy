@@ -17,6 +17,7 @@ import {
   Text,
   TextInput,
   View,
+  BackHandler,
   useColorScheme,
   Modal,
   StyleSheet
@@ -220,6 +221,19 @@ function AppContent() {
     }
     loadTimeline(false);
   }, [activeAccount, activeTab]);
+
+  useEffect(() => {
+    const onBackPress = () => {
+      if (viewingUserId) {
+        setViewingUserId(null);
+        return true;
+      }
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [viewingUserId]);
 
   const finishMiAuthLogin = useCallback(async (session: string, host: string) => {
     const hadActiveAccount = Boolean(activeAccountId);
@@ -572,28 +586,30 @@ function AppContent() {
     <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]}>
       <StatusBar style="dark" />
 
-      <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
-        <Pressable
-          style={({ pressed }) => [styles.headerAccountButton, pressed && styles.buttonPressed]}
-          onPress={() =>
-            setAccountMenuOpen((current) => {
-              if (current) {
-                setAddingAccount(false);
-                setOauthError(null);
-              }
-              return !current;
-            })
-          }
-        >
-          <Image source={{ uri: activeAccount.avatarUrl }} style={styles.headerAvatar} />
-          <View>
-            <Text style={[styles.headerAppName, { color: colors.primaryText }]}>Crispy</Text>
-            <Text style={[styles.headerName, { color: colors.text }]}>{activeAccount.displayName}</Text>
-            <Text style={[styles.headerMeta, { color: colors.textMuted }]}>@{activeAccount.username} · {activeAccount.host}</Text>
-          </View>
-          <Ionicons name={accountMenuOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
-        </Pressable>
-      </View>
+      {(!viewingUserId && mainTab !== 'profile') && (
+        <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
+          <Pressable
+            style={({ pressed }) => [styles.headerAccountButton, pressed && styles.buttonPressed]}
+            onPress={() =>
+              setAccountMenuOpen((current) => {
+                if (current) {
+                  setAddingAccount(false);
+                  setOauthError(null);
+                }
+                return !current;
+              })
+            }
+          >
+            <Image source={{ uri: activeAccount.avatarUrl }} style={styles.headerAvatar} />
+            <View>
+              <Text style={[styles.headerAppName, { color: colors.primaryText }]}>Crispy</Text>
+              <Text style={[styles.headerName, { color: colors.text }]}>{activeAccount.displayName}</Text>
+              <Text style={[styles.headerMeta, { color: colors.textMuted }]}>@{activeAccount.username} · {activeAccount.host}</Text>
+            </View>
+            <Ionicons name={accountMenuOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
+          </Pressable>
+        </View>
+      )}
 
       {!viewingUserId && mainTab === 'home' && (
         <View style={[styles.tabBar, { backgroundColor: colors.tabBg }]}>
