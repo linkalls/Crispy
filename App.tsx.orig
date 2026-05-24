@@ -17,7 +17,6 @@ import {
   Text,
   TextInput,
   View,
-  BackHandler,
   useColorScheme,
   Modal,
   StyleSheet
@@ -114,7 +113,7 @@ function AppContent() {
   const [toast, setToast] = useState<{ visible: boolean; title: string; message?: string; isError?: boolean }>({ visible: false, title: '' });
   const [isLogoutConfirmVisible, setIsLogoutConfirmVisible] = useState(false);
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
-  
+
   const showToast = (title: string, message?: string, isError = false) => {
     setToast({ visible: true, title, message, isError });
   };
@@ -221,19 +220,6 @@ function AppContent() {
     }
     loadTimeline(false);
   }, [activeAccount, activeTab]);
-
-  useEffect(() => {
-    const onBackPress = () => {
-      if (viewingUserId) {
-        setViewingUserId(null);
-        return true;
-      }
-      return false;
-    };
-
-    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
-    return () => subscription.remove();
-  }, [viewingUserId]);
 
   const finishMiAuthLogin = useCallback(async (session: string, host: string) => {
     const hadActiveAccount = Boolean(activeAccountId);
@@ -586,30 +572,28 @@ function AppContent() {
     <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]}>
       <StatusBar style="dark" />
 
-      {(!viewingUserId && mainTab !== 'profile') && (
-        <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
-          <Pressable
-            style={({ pressed }) => [styles.headerAccountButton, pressed && styles.buttonPressed]}
-            onPress={() =>
-              setAccountMenuOpen((current) => {
-                if (current) {
-                  setAddingAccount(false);
-                  setOauthError(null);
-                }
-                return !current;
-              })
-            }
-          >
-            <Image source={{ uri: activeAccount.avatarUrl }} style={styles.headerAvatar} />
-            <View>
-              <Text style={[styles.headerAppName, { color: colors.primaryText }]}>Crispy</Text>
-              <Text style={[styles.headerName, { color: colors.text }]}>{activeAccount.displayName}</Text>
-              <Text style={[styles.headerMeta, { color: colors.textMuted }]}>@{activeAccount.username} · {activeAccount.host}</Text>
-            </View>
-            <Ionicons name={accountMenuOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
-          </Pressable>
-        </View>
-      )}
+      <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
+        <Pressable
+          style={({ pressed }) => [styles.headerAccountButton, pressed && styles.buttonPressed]}
+          onPress={() =>
+            setAccountMenuOpen((current) => {
+              if (current) {
+                setAddingAccount(false);
+                setOauthError(null);
+              }
+              return !current;
+            })
+          }
+        >
+          <Image source={{ uri: activeAccount.avatarUrl }} style={styles.headerAvatar} />
+          <View>
+            <Text style={[styles.headerAppName, { color: colors.primaryText }]}>Crispy</Text>
+            <Text style={[styles.headerName, { color: colors.text }]}>{activeAccount.displayName}</Text>
+            <Text style={[styles.headerMeta, { color: colors.textMuted }]}>@{activeAccount.username} · {activeAccount.host}</Text>
+          </View>
+          <Ionicons name={accountMenuOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
+        </Pressable>
+      </View>
 
       {!viewingUserId && mainTab === 'home' && (
         <View style={[styles.tabBar, { backgroundColor: colors.tabBg }]}>
@@ -955,7 +939,7 @@ function AppContent() {
       {activeAccount && (
         <FAB onPress={() => setIsNoteComposerVisible(true)} colors={colors} />
       )}
-      
+
       <BottomNavigation activeTab={mainTab} onTabChange={(tab) => { setMainTab(tab); setViewingUserId(null); }} colors={colors} />
 
       <NoteComposerModal

@@ -1,0 +1,34 @@
+--- App.tsx
++++ App.tsx
+@@ -19,6 +19,7 @@
+   Text,
+   TextInput,
+   View,
++  BackHandler,
+   useColorScheme,
+   Modal,
+   StyleSheet
+@@ -201,6 +202,23 @@
+     loadTimeline(false);
+   }, [activeAccount, activeTab]);
+
++  useEffect(() => {
++    const onBackPress = () => {
++      if (isDetailModalVisible) {
++        setIsDetailModalVisible(false);
++        return true;
++      }
++      if (viewingUserId) {
++        setViewingUserId(null);
++        return true;
++      }
++      return false;
++    };
++
++    BackHandler.addEventListener('hardwareBackPress', onBackPress);
++    return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
++  }, [isDetailModalVisible, viewingUserId]);
++
+   const finishMiAuthLogin = useCallback(async (session: string, host: string) => {
+     const hadActiveAccount = Boolean(activeAccountId);
+     try {

@@ -1,0 +1,54 @@
+--- App.tsx
++++ App.tsx
+@@ -487,22 +487,24 @@
+     <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]}>
+       <StatusBar style="dark" />
+
+-      <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
+-        <Pressable
+-          style={({ pressed }) => [styles.headerAccountButton, pressed && styles.buttonPressed]}
+-          onPress={() =>
+-            setAccountMenuOpen((current) => {
+-              if (current) {
+-                setAddingAccount(false);
+-                setOauthError(null);
+-              }
+-              return !current;
+-            })
+-          }
+-        >
+-          <Image source={{ uri: activeAccount.avatarUrl }} style={styles.headerAvatar} />
+-          <View>
+-            <Text style={[styles.headerAppName, { color: colors.primaryText }]}>Crispy</Text>
+-            <Text style={[styles.headerName, { color: colors.text }]}>{activeAccount.displayName}</Text>
+-            <Text style={[styles.headerMeta, { color: colors.textMuted }]}>@{activeAccount.username} · {activeAccount.host}</Text>
+-          </View>
+-          <Ionicons name={accountMenuOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
+-        </Pressable>
+-      </View>
++      {(!viewingUserId && mainTab !== 'profile') && (
++        <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
++          <Pressable
++            style={({ pressed }) => [styles.headerAccountButton, pressed && styles.buttonPressed]}
++            onPress={() =>
++              setAccountMenuOpen((current) => {
++                if (current) {
++                  setAddingAccount(false);
++                  setOauthError(null);
++                }
++                return !current;
++              })
++            }
++          >
++            <Image source={{ uri: activeAccount.avatarUrl }} style={styles.headerAvatar} />
++            <View>
++              <Text style={[styles.headerAppName, { color: colors.primaryText }]}>Crispy</Text>
++              <Text style={[styles.headerName, { color: colors.text }]}>{activeAccount.displayName}</Text>
++              <Text style={[styles.headerMeta, { color: colors.textMuted }]}>@{activeAccount.username} · {activeAccount.host}</Text>
++            </View>
++            <Ionicons name={accountMenuOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textMuted} />
++          </Pressable>
++        </View>
++      )}
+
+       {!viewingUserId && mainTab === 'home' && (
