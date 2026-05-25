@@ -345,6 +345,8 @@ function AppContent() {
       'write:reactions',
       'read:notifications',
       'write:notifications',
+      'read:drive',
+      'write:drive',
     ].join(',');
 
     const authUrl = `https://${host}/miauth/${session}?name=${encodeURIComponent(
