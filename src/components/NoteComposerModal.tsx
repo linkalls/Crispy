@@ -28,12 +28,14 @@ export function NoteComposerModal({
   visible,
   colors,
   activeAccount,
+  misskeyRequest,
   onClose,
   onSubmit,
 }: {
   visible: boolean;
   colors: ColorScheme;
   activeAccount: StoredAccount | null;
+  misskeyRequest: <T>(path: string, payload: Record<string, unknown>, requiresAuth?: boolean) => Promise<T>;
   onClose: () => void;
   onSubmit: (text: string, cw: string | null, visibility: string, fileIds: string[]) => Promise<void>;
 }) {
@@ -66,31 +68,25 @@ export function NoteComposerModal({
   };
 
   const uploadImage = async (uri: string): Promise<string | null> => {
-    if (!activeAccount || !activeAccount.token) return null;
+    if (!activeAccount || !activeAccount.token || activeAccount.token === 'mock_token') return null;
 
     try {
-      const formData = new FormData();
-      formData.append('i', activeAccount.token);
-      
       const filename = uri.split('/').pop() || 'image.jpg';
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : 'image/jpeg';
+      const fileResponse = await fetch(uri);
+      const blob = await fileResponse.blob();
 
-      formData.append('file', {
-        uri,
-        name: filename,
-        type,
-      } as any);
-
-      const hostUrl = activeAccount.host.replace(/\/+$/, '');
-      const response = await fetch(`https://${hostUrl}/api/drive/files/create`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) throw new Error(`Upload failed: ${response.status}`);
-      const data = await response.json();
-      return data.id;
+      const data = await misskeyRequest<{ id: string }>(
+        '/api/drive/files/create',
+        {
+          file: blob,
+          name: filename,
+          type,
+        },
+        true,
+      );
+      return data?.id || null;
     } catch (e) {
       console.error('Image upload error:', e);
       return null;

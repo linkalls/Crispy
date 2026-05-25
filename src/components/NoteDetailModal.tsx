@@ -18,6 +18,7 @@ import { ColorScheme, TimelineNote, MisskeyNote } from "../utils/types";
 import { MfmRenderer } from "./MfmRenderer";
 import { ReplyComposer } from "./ReplyComposer";
 import { mapNote } from "../utils/formatting";
+import { resolveImagePreviewUrl } from "../utils/misskeyApi";
 import * as mfm from "mfm-js";
 
 export function NoteDetailModal({
@@ -194,7 +195,7 @@ export function NoteDetailModal({
                     return (
                       <View key={idx} style={styles.mainNoteMediaItem}>
                         {isImage || isVideo ? (
-                          <Pressable onPress={() => onImagePress ? onImagePress(file.url) : undefined}>
+                          <Pressable onPress={() => onImagePress ? onImagePress(resolveImagePreviewUrl(file.url, file.thumbnailUrl)) : undefined}>
                             <Image
                               source={{ uri: file.thumbnailUrl || file.url }}
                               style={styles.mainNoteMediaImage}
@@ -353,7 +354,7 @@ export function NoteDetailModal({
                               return (
                                 <View key={fIdx} style={styles.replyMediaItem}>
                                   {isImage || isVideo ? (
-                                    <Pressable onPress={() => onImagePress ? onImagePress(file.url) : undefined}>
+                                    <Pressable onPress={() => onImagePress ? onImagePress(resolveImagePreviewUrl(file.url, file.thumbnailUrl)) : undefined}>
                                       <Image
                                         source={{ uri: file.thumbnailUrl || file.url }}
                                         style={styles.replyMediaImage}

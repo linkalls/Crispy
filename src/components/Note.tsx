@@ -3,6 +3,7 @@ import * as mfm from 'mfm-js';
 import { Image, Pressable, Text, View, Linking } from 'react-native';
 import { styles } from '../styles/styles';
 import { ColorScheme, TimelineNote } from '../utils/types';
+import { resolveImagePreviewUrl } from '../utils/misskeyApi';
 import { MfmRenderer } from './MfmRenderer';
 import { ReplyComposer } from './ReplyComposer';
 
@@ -107,7 +108,14 @@ export function Note({
                 return (
                   <View key={idx} style={styles.mediaItem}>
                     {isImage || isVideo ? (
-                      <Pressable onPress={() => onImagePress ? onImagePress(file.url) : Linking.openURL(file.url)}>
+                      <Pressable
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          const previewUrl = resolveImagePreviewUrl(file.url, file.thumbnailUrl);
+                          if (onImagePress) onImagePress(previewUrl);
+                          else Linking.openURL(previewUrl);
+                        }}
+                      >
                         <Image
                           source={{ uri: file.thumbnailUrl || file.url }}
                           style={styles.mediaImage}
@@ -153,7 +161,14 @@ export function Note({
                     return (
                       <View key={idx} style={styles.quoteMediaItem}>
                         {isImage || isVideo ? (
-                          <Pressable onPress={() => onImagePress ? onImagePress(file.url) : Linking.openURL(file.url)}>
+                          <Pressable
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              const previewUrl = resolveImagePreviewUrl(file.url, file.thumbnailUrl);
+                              if (onImagePress) onImagePress(previewUrl);
+                              else Linking.openURL(previewUrl);
+                            }}
+                          >
                             <Image
                               source={{ uri: file.thumbnailUrl || file.url }}
                               style={styles.quoteMediaImage}
