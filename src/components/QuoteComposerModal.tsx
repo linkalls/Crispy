@@ -1,7 +1,7 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState } from "react";
 import {
   Modal,
-  SafeAreaView,
   View,
   Text,
   TextInput,
@@ -11,6 +11,7 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  BackHandler,
 } from "react-native";
 import { ColorScheme, TimelineNote } from "../utils/types";
 import { MfmRenderer } from "./MfmRenderer";
@@ -29,8 +30,19 @@ export function QuoteComposerModal({
   onClose: () => void;
   onSubmit: (text: string) => Promise<void>;
 }) {
+  const insets = useSafeAreaInsets();
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    if (Platform.OS === 'android' && visible) {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        onClose();
+        return true;
+      });
+      return () => sub.remove();
+    }
+  }, [visible, onClose]);
 
   if (!note) return null;
 
@@ -51,7 +63,7 @@ export function QuoteComposerModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.bg }]}>
+      <View style={[styles.container, { backgroundColor: colors.bg, paddingTop: Platform.OS === "android" ? insets.top : 0, paddingBottom: insets.bottom }]}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={{ flex: 1 }}
@@ -108,7 +120,7 @@ export function QuoteComposerModal({
             </View>
           </View>
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }

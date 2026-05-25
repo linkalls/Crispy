@@ -11,6 +11,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  BackHandler,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -57,6 +58,16 @@ export function NoteDetailModal({
   const [loadingReplies, setLoadingReplies] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [sendingReply, setSendingReply] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === 'android' && visible) {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        onClose();
+        return true;
+      });
+      return () => sub.remove();
+    }
+  }, [visible, onClose]);
 
   const fetchReplies = useCallback(async () => {
     if (!note) return;
@@ -185,6 +196,45 @@ export function NoteDetailModal({
 
               <View style={styles.mainNoteContentContainer}>
                 <MfmRenderer nodes={mfm.parse(note.content)} emojis={note.emojis} colors={colors} />
+
+                {/* メディア表示 */}
+                {note.files && note.files.length > 0 && (
+                  <View style={styles.mediaContainer}>
+                    {note.files.map((file, idx) => {
+                      const isImage = file.type?.startsWith('image/');
+                      const isVideo = file.type?.startsWith('video/');
+                      return (
+                        <View key={idx} style={styles.mediaItem}>
+                          {isImage || isVideo ? (
+                            <Pressable
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                const previewUrl = resolveImagePreviewUrl(file.url, file.thumbnailUrl);
+                                if (onImagePress) onImagePress(previewUrl);
+                              }}
+                            >
+                              <Image
+                                source={{ uri: file.url || file.thumbnailUrl }}
+                                style={styles.mediaImage}
+                                resizeMode="cover"
+                              />
+                            </Pressable>
+                          ) : (
+                            <View style={[styles.mediaFile, { backgroundColor: colors.reactionBg }]}>
+                              <Ionicons name="document-outline" size={24} color={colors.textMuted} />
+                              <Text
+                                style={[styles.mediaFileName, { color: colors.textMuted }]}
+                                numberOfLines={1}
+                              >
+                                {file.url.split('/').pop() || 'ファイル'}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
 
               {note.files.length > 0 && (
@@ -425,6 +475,36 @@ export function NoteDetailModal({
 }
 
 const styles = StyleSheet.create({
+  mediaContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+    gap: 4,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  mediaItem: {
+    flex: 1,
+    minWidth: '48%',
+    aspectRatio: 1.5,
+  },
+  mediaImage: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#00000010',
+  },
+  mediaFile: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 8,
+  },
+  mediaFileName: {
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: 'center',
+  },
   container: {
     flex: 1,
   },

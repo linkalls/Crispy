@@ -1,3 +1,4 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React from "react";
 import {
   Modal,
@@ -5,7 +6,8 @@ import {
   Text,
   Pressable,
   StyleSheet,
-  SafeAreaView,
+  Platform,
+  BackHandler,
 } from "react-native";
 import { ColorScheme, TimelineNote } from "../utils/types";
 
@@ -24,6 +26,17 @@ export function ReactionPickerModal({
   onClose: () => void;
   onSelectReaction: (note: TimelineNote, reaction: string) => void;
 }) {
+  const insets = useSafeAreaInsets();
+  React.useEffect(() => {
+    if (Platform.OS === 'android' && visible) {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        onClose();
+        return true;
+      });
+      return () => sub.remove();
+    }
+  }, [visible, onClose]);
+
   if (!note) return null;
 
   return (
@@ -35,7 +48,7 @@ export function ReactionPickerModal({
     >
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <SafeAreaView style={[styles.sheet, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.cardBg, borderColor: colors.border, paddingBottom: Math.max(insets.bottom, 16) }]}>
           <View style={styles.handleContainer}>
             <View style={[styles.handle, { backgroundColor: colors.border }]} />
           </View>
@@ -71,7 +84,7 @@ export function ReactionPickerModal({
           >
             <Text style={[styles.cancelButtonText, { color: colors.text }]}>キャンセル</Text>
           </Pressable>
-        </SafeAreaView>
+        </View>
       </View>
     </Modal>
   );

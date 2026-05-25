@@ -219,18 +219,18 @@ export function ProfileScreen({
 
         {/* Stats */}
         <View style={localStyles.statsRow}>
-          <View style={localStyles.statItem}>
+          <Pressable style={localStyles.statItem} onPress={() => setActiveTab('following')}>
             <Text style={[localStyles.statNumber, { color: colors.text }]}>{profile?.followingCount ?? 0}</Text>
             <Text style={[localStyles.statLabel, { color: colors.textMuted }]}>フォロー</Text>
-          </View>
-          <View style={localStyles.statItem}>
+          </Pressable>
+          <Pressable style={localStyles.statItem} onPress={() => setActiveTab('followers')}>
             <Text style={[localStyles.statNumber, { color: colors.text }]}>{profile?.followersCount ?? 0}</Text>
             <Text style={[localStyles.statLabel, { color: colors.textMuted }]}>フォロワー</Text>
-          </View>
-          <View style={localStyles.statItem}>
+          </Pressable>
+          <Pressable style={localStyles.statItem} onPress={() => setActiveTab('notes')}>
             <Text style={[localStyles.statNumber, { color: colors.text }]}>{profile?.notesCount ?? 0}</Text>
             <Text style={[localStyles.statLabel, { color: colors.textMuted }]}>ノート</Text>
-          </View>
+          </Pressable>
         </View>
 
         {/* Divider */}
