@@ -125,7 +125,37 @@ export function useMisskey(activeAccount: StoredAccount | null) {
         if (!client) {
           throw new Error("Misskey APIクライアントを初期化できませんでした。");
         }
-        return await client.request(endpoint as any, payload as any);
+
+        const isMultipart = endpoint.startsWith('drive/files/');
+        let result;
+
+        if (isMultipart && payload.file) {
+          // Handle React Native FormData upload manually instead of going through misskey-js
+          const formData = new FormData();
+          formData.append('i', activeAccount.token);
+
+          for (const [key, value] of Object.entries(payload)) {
+            if (value !== undefined && value !== null) {
+              formData.append(key, value as any);
+            }
+          }
+
+          const hostUrl = activeAccount.host.replace(/\/+$/, '');
+          const res = await fetch(`https://${hostUrl}/api/${endpoint}`, {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!res.ok) {
+            const errBody = await res.text().catch(() => '');
+            throw new Error(`API Error: ${res.status} ${errBody}`);
+          }
+          result = await res.json();
+        } else {
+          result = await client.request(endpoint as any, payload as any);
+        }
+
+        return result as T;
       } catch (e: any) {
         if (e && typeof e === 'object' && mk.api.isAPIError(e)) {
           throw new Error(e.message || `${e.code} (${e.id})`);

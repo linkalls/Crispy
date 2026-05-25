@@ -87,14 +87,19 @@ export function NoteComposerModal({
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : 'image/jpeg';
 
-      // Read local file URI into a Blob
-      const fileResponse = await fetch(uri);
-      const blob = await fileResponse.blob();
+      // In React Native, the default blob type might be incorrect or missing, which can cause
+      // FormData to drop the file or not send it correctly in misskey-js.
+      // However, we actually need to pass `{ uri, name, type }` as the file object for FormData in React Native.
+      const rnFile = {
+        uri: uri,
+        name: filename,
+        type: type,
+      } as any;
 
       const data = await misskeyRequest<{ id: string }>(
         'drive/files/create',
         {
-          file: blob,
+          file: rnFile,
           name: filename,
         },
         true
