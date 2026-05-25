@@ -13,6 +13,7 @@ import {
   Image,
   ScrollView,
   BackHandler,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -87,14 +88,19 @@ export function NoteComposerModal({
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : 'image/jpeg';
 
-      // Read local file URI into a Blob
-      const fileResponse = await fetch(uri);
-      const blob = await fileResponse.blob();
+      // In React Native, the default blob type might be incorrect or missing, which can cause
+      // FormData to drop the file or not send it correctly in misskey-js.
+      // However, we actually need to pass `{ uri, name, type }` as the file object for FormData in React Native.
+      const rnFile = {
+        uri: uri,
+        name: filename,
+        type: type,
+      } as any;
 
       const data = await misskeyRequest<{ id: string }>(
         'drive/files/create',
         {
-          file: blob,
+          file: rnFile,
           name: filename,
         },
         true
@@ -102,7 +108,7 @@ export function NoteComposerModal({
       return data?.id || null;
     } catch (e) {
       console.error('Image upload error:', e);
-      return null;
+      throw e; // We should throw it to surface the error rather than swallowing it and trying to submit the note without the file
     }
   };
 
@@ -131,8 +137,11 @@ export function NoteComposerModal({
       setVisibility('public');
       setImages([]);
       onClose();
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      // Pass the error to the onSubmit callback by triggering a fake rejection, or since onSubmit is our bridge to App.tsx, we can't easily bubble up.
+      // However, to alert the user, we can pass it through a rejected promise.
+      Alert.alert('投稿エラー', e.message);
     } finally {
       setSending(false);
     }
