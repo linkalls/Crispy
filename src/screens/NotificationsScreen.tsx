@@ -210,12 +210,14 @@ export function NotificationsScreen({
 
     let message = getNotificationMessage(item.type, reactionEmoji);
     let userName = targetUser?.name || targetUser?.username;
-    if (!userName && item.type.startsWith('app')) {
-      userName = item.header || 'システム通知';
-    }
-    userName = userName || '不明';
     let userHost = targetUser?.host ? `@${targetUser.host}` : '';
     let suffix = '';
+
+    if (item.type === 'app' || item.type === 'login') {
+       userName = 'System';
+       message = item.header || message;
+    }
+    userName = userName || '不明';
 
     if (item.type === 'reaction:grouped' && item.reactions && item.reactions.length > 1) {
       suffix = ` ほか${item.reactions.length - 1}人`;
@@ -242,7 +244,11 @@ export function NotificationsScreen({
         <View style={{ flex: 1 }}>
           <Text style={[localStyles.userName, { color: colors.text }]} numberOfLines={1}>
             {userName}
-            <Text style={{ color: colors.textMuted, fontWeight: '400', fontSize: 13 }}>{suffix} @{targetUser?.username}{userHost}</Text>
+            {(targetUser?.username || suffix) && (
+              <Text style={{ color: colors.textMuted, fontWeight: '400', fontSize: 13 }}>
+                {suffix} {targetUser?.username ? `@${targetUser.username}${userHost}` : ''}
+              </Text>
+            )}
           </Text>
           <Text style={[localStyles.message, { color: colors.textMuted }]}>{message}</Text>
           {item.note?.text && (

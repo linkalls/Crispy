@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
-  SafeAreaView,
   View,
   Text,
   TextInput,
@@ -12,6 +12,7 @@ import {
   Switch,
   Image,
   ScrollView,
+  BackHandler,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -39,12 +40,23 @@ export function NoteComposerModal({
   onClose: () => void;
   onSubmit: (text: string, cw: string | null, visibility: string, fileIds: string[]) => Promise<void>;
 }) {
+  const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
   const [cw, setCw] = useState('');
   const [useCw, setUseCw] = useState(false);
   const [visibility, setVisibility] = useState('public');
   const [sending, setSending] = useState(false);
   const [images, setImages] = useState<AttachedImage[]>([]);
+
+  useEffect(() => {
+    if (Platform.OS === 'android' && visible) {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        onClose();
+        return true;
+      });
+      return () => sub.remove();
+    }
+  }, [visible, onClose]);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -74,17 +86,18 @@ export function NoteComposerModal({
       const filename = uri.split('/').pop() || 'image.jpg';
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+      // Read local file URI into a Blob
       const fileResponse = await fetch(uri);
       const blob = await fileResponse.blob();
 
       const data = await misskeyRequest<{ id: string }>(
-        '/api/drive/files/create',
+        'drive/files/create',
         {
           file: blob,
           name: filename,
-          type,
         },
-        true,
+        true
       );
       return data?.id || null;
     } catch (e) {
@@ -129,7 +142,7 @@ export function NoteComposerModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: Platform.OS === "android" ? insets.top : 0, paddingBottom: insets.bottom }}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           
           {/* Header */}
@@ -221,7 +234,7 @@ export function NoteComposerModal({
           </View>
 
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 }

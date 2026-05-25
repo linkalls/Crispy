@@ -1,7 +1,7 @@
-import React from 'react';
-import { Modal, View, Image, Pressable, StyleSheet, Platform } from 'react-native';
+import React, { useEffect } from 'react';
+import { Modal, View, Image, Pressable, StyleSheet, Platform, BackHandler } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export interface ImageViewerModalProps {
   visible: boolean;
@@ -11,6 +11,16 @@ export interface ImageViewerModalProps {
 
 export function ImageViewerModal({ visible, imageUrl, onClose }: ImageViewerModalProps) {
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    if (Platform.OS === 'android' && visible) {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        onClose();
+        return true;
+      });
+      return () => sub.remove();
+    }
+  }, [visible, onClose]);
 
   if (!imageUrl) return null;
 
@@ -23,24 +33,22 @@ export function ImageViewerModal({ visible, imageUrl, onClose }: ImageViewerModa
     >
       <View style={styles.container}>
         <View style={[styles.header, { paddingTop: Platform.OS === 'android' ? insets.top : 0 }]}>
-          <SafeAreaView>
+          <View>
             <Pressable
               style={({ pressed }) => [styles.closeButton, pressed && styles.closeButtonPressed]}
               onPress={onClose}
             >
               <Ionicons name="close" size={28} color="#ffffff" />
             </Pressable>
-          </SafeAreaView>
+          </View>
         </View>
 
         <Pressable style={styles.imageContainer} onPress={onClose}>
-          <Pressable>
-            <Image
-              source={{ uri: imageUrl }}
-              style={styles.image}
-              resizeMode="contain"
-            />
-          </Pressable>
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.image}
+            resizeMode="contain"
+          />
         </Pressable>
       </View>
     </Modal>
@@ -73,8 +81,6 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   image: {
     width: '100%',

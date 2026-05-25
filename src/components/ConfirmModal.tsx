@@ -1,5 +1,5 @@
-import React from "react";
-import { Modal, View, Text, Pressable, StyleSheet } from "react-native";
+import React, { useEffect } from "react";
+import { Modal, View, Text, Pressable, StyleSheet, Platform, BackHandler } from "react-native";
 import { ColorScheme } from "../utils/types";
 
 export function ConfirmModal({
@@ -23,6 +23,16 @@ export function ConfirmModal({
   onConfirm: () => void;
   onClose: () => void;
 }) {
+  useEffect(() => {
+    if (Platform.OS === 'android' && visible) {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        onClose();
+        return true;
+      });
+      return () => sub.remove();
+    }
+  }, [visible, onClose]);
+
   return (
     <Modal
       visible={visible}

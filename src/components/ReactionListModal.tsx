@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Modal, View, Text, Pressable, StyleSheet, SafeAreaView, FlatList, Image, ActivityIndicator } from "react-native";
+import { Modal, View, Text, Pressable, StyleSheet, SafeAreaView, FlatList, Image, ActivityIndicator, Platform, BackHandler } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ColorScheme, TimelineNote } from "../utils/types";
 
@@ -20,9 +20,19 @@ export function ReactionListModal({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (Platform.OS === 'android' && visible) {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        onClose();
+        return true;
+      });
+      return () => sub.remove();
+    }
+  }, [visible, onClose]);
+
+  useEffect(() => {
     if (visible && note) {
       setLoading(true);
-      misskeyRequest<any[]>('/api/notes/reactions', { noteId: note.id, limit: 100 }, true)
+      misskeyRequest<any[]>('/api/notes/reactions', { noteId: note.targetId || note.id, limit: 100 }, true)
         .then(data => setReactions(data))
         .catch(console.error)
         .finally(() => setLoading(false));
