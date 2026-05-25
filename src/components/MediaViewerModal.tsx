@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Modal, View, StyleSheet, Platform, BackHandler } from 'react-native';
+import { Modal, View, Image, StyleSheet, Platform, BackHandler } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Video, ResizeMode } from 'expo-av';
@@ -7,6 +7,7 @@ import ImageViewer from 'react-native-image-zoom-viewer';
 
 export interface MediaItem {
   url: string;
+  thumbnailUrl?: string;
   type?: string;
 }
 
@@ -37,7 +38,7 @@ export function MediaViewerModal({ visible, media, initialIndex = 0, onClose }: 
     return item.url.match(/\.(mp4|webm|mov|mkv)$/i) !== null;
   };
 
-  const imagesForViewer = media.map(item => ({ url: item.url, props: { type: item.type } }));
+  const imagesForViewer = media.map(item => ({ url: item.url, props: { type: item.type, source: { uri: item.url }, thumbnail: item.thumbnailUrl } }));
 
   return (
     <Modal
@@ -58,6 +59,7 @@ export function MediaViewerModal({ visible, media, initialIndex = 0, onClose }: 
               <Ionicons name="close" size={28} color="#ffffff" onPress={onClose} style={styles.closeButton} />
             </View>
           )}
+          loadingRender={() => <Ionicons name="image-outline" size={64} color="rgba(255,255,255,0.2)" />}
           renderImage={(props) => {
             const item = media.find(m => m.url === props.source.uri);
             if (item && isVideo(item)) {
@@ -74,8 +76,13 @@ export function MediaViewerModal({ visible, media, initialIndex = 0, onClose }: 
                 </View>
               );
             }
-            // Let the viewer handle default image rendering
-            return undefined as any;
+
+            // Render original if available, but since we are overriding renderImage, the viewer passes the downloaded source in props
+            return (
+              <View style={props.style}>
+                <Image {...props} style={StyleSheet.absoluteFill} resizeMode="contain" />
+              </View>
+            );
           }}
         />
       </View>

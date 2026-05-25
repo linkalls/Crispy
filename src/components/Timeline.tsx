@@ -40,7 +40,7 @@ export function Timeline({
   onReactionPress: (note: import('../utils/types').TimelineNote, index: number) => void;
   onNotePress?: (note: TimelineNote) => void;
   onUserPress?: (userId: string) => void;
-  onImagePress?: (media: { url: string; type?: string }[], index: number) => void;
+  onImagePress?: (media: { url: string; thumbnailUrl?: string; type?: string }[], index: number) => void;
 }) {
   if (isLoading) {
     return (

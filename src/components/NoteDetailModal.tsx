@@ -51,7 +51,7 @@ export function NoteDetailModal({
   onReplySubmitSuccess: () => void;
   onShowToast: (title: string, msg?: string, isErr?: boolean) => void;
   onUserPress?: (userId: string) => void;
-  onImagePress?: (media: { url: string; type?: string }[], index: number) => void;
+  onImagePress?: (media: { url: string; thumbnailUrl?: string; type?: string }[], index: number) => void;
 }) {
   const insets = useSafeAreaInsets();
   const [replies, setReplies] = useState<TimelineNote[]>([]);
@@ -207,7 +207,7 @@ export function NoteDetailModal({
                       <View key={idx} style={styles.mainNoteMediaItem}>
                         {isImage || isVideo ? (
                           <Pressable onPress={() => {
-                            const mediaItems = note!.files.filter(f => f.type?.startsWith('image/') || f.type?.startsWith('video/')).map(f => ({ url: resolveImagePreviewUrl(f.url, f.thumbnailUrl), type: f.type }));
+                            const mediaItems = note!.files.filter(f => f.type?.startsWith('image/') || f.type?.startsWith('video/')).map(f => ({ url: f.url, thumbnailUrl: f.thumbnailUrl || undefined, type: f.type }));
                             const mediaIndex = note!.files.filter(f => f.type?.startsWith('image/') || f.type?.startsWith('video/')).findIndex(f => f.url === file.url);
                             if (onImagePress) onImagePress(mediaItems, mediaIndex);
                           }}>
@@ -370,7 +370,7 @@ export function NoteDetailModal({
                                 <View key={fIdx} style={styles.replyMediaItem}>
                                   {isImage || isVideo ? (
                                     <Pressable onPress={() => {
-                                      const mediaItems = replyNote.files.filter(f => f.type?.startsWith('image/') || f.type?.startsWith('video/')).map(f => ({ url: resolveImagePreviewUrl(f.url, f.thumbnailUrl), type: f.type }));
+                                      const mediaItems = replyNote.files.filter(f => f.type?.startsWith('image/') || f.type?.startsWith('video/')).map(f => ({ url: f.url, thumbnailUrl: f.thumbnailUrl || undefined, type: f.type }));
                                       const mediaIndex = replyNote.files.filter(f => f.type?.startsWith('image/') || f.type?.startsWith('video/')).findIndex(f => f.url === file.url);
                                       if (onImagePress) onImagePress(mediaItems, mediaIndex);
                                     }}>

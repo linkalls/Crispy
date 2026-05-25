@@ -119,7 +119,7 @@ function AppContent() {
   const [isLogoutConfirmVisible, setIsLogoutConfirmVisible] = useState(false);
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
   const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
-  const [previewMedia, setPreviewMedia] = useState<{ url: string; type?: string }[]>([]);
+  const [previewMedia, setPreviewMedia] = useState<{ url: string; thumbnailUrl?: string; type?: string }[]>([]);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
   
   const showToast = (title: string, message?: string, isError = false) => {
@@ -485,7 +485,7 @@ function AppContent() {
     }
   };
 
-  const handleImagePress = (media: { url: string; type?: string }[], index: number) => {
+  const handleImagePress = (media: { url: string; thumbnailUrl?: string; type?: string }[], index: number) => {
     setPreviewMedia(media);
     setPreviewImageIndex(index);
     setIsImageViewerVisible(true);
