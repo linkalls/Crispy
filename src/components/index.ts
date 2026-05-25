@@ -15,3 +15,4 @@ export * from "./Toast";
 export * from "./BottomNavigation";
 export * from "./FAB";
 export * from "./NoteComposerModal";
+export * from "./ImageViewerModal";

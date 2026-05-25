@@ -21,6 +21,7 @@ export function Timeline({
   onReactionPress,
   onNotePress,
   onUserPress,
+  onImagePress,
 }: {
   notes: TimelineNote[];
   isLoading: boolean;
@@ -39,6 +40,7 @@ export function Timeline({
   onReactionPress: (note: import('../utils/types').TimelineNote, index: number) => void;
   onNotePress?: (note: TimelineNote) => void;
   onUserPress?: (userId: string) => void;
+  onImagePress?: (url: string) => void;
 }) {
   if (isLoading) {
     return (
@@ -104,6 +106,7 @@ export function Timeline({
           onSharePress={() => onSharePress(note)}
           onReactionPress={(index) => onReactionPress(note, index)}
           onUserPress={onUserPress}
+          onImagePress={onImagePress}
         />
       )}
     />
