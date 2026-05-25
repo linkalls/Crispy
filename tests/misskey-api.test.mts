@@ -14,10 +14,10 @@ test('normalizeMisskeyEndpoint rejects empty endpoint', () => {
   assert.throws(() => normalizeMisskeyEndpoint('  '), /endpoint is empty/i);
 });
 
-test('resolveImagePreviewUrl prefers thumbnail URL when available', () => {
+test('resolveImagePreviewUrl prefers original URL instead of thumbnail to load full quality', () => {
   assert.equal(
     resolveImagePreviewUrl('https://example.com/original.jpg', 'https://example.com/thumb.jpg'),
-    'https://example.com/thumb.jpg',
+    'https://example.com/original.jpg',
   );
   assert.equal(
     resolveImagePreviewUrl('https://example.com/original.jpg', ''),

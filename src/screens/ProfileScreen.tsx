@@ -53,7 +53,7 @@ export function ProfileScreen({
   viewingUserId?: string | null;
   onBack?: () => void;
   onUserPress?: (userId: string) => void;
-  onImagePress?: (url: string) => void;
+  onImagePress?: (media: { url: string; type?: string }[], index: number) => void;
 }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [notes, setNotes] = useState<TimelineNote[]>([]);

@@ -35,7 +35,7 @@ import {
   BottomNavigation,
   FAB,
   NoteComposerModal,
-  ImageViewerModal,
+  MediaViewerModal,
 } from './src/components';
 import { NotificationsScreen, ExploreScreen, ProfileScreen } from './src/screens';
 import { useMisskey, useMisskeyStream } from './src/hooks';
@@ -119,7 +119,8 @@ function AppContent() {
   const [isLogoutConfirmVisible, setIsLogoutConfirmVisible] = useState(false);
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
   const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
-  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [previewMedia, setPreviewMedia] = useState<{ url: string; type?: string }[]>([]);
+  const [previewImageIndex, setPreviewImageIndex] = useState(0);
   
   const showToast = (title: string, message?: string, isError = false) => {
     setToast({ visible: true, title, message, isError });
@@ -484,8 +485,9 @@ function AppContent() {
     }
   };
 
-  const handleImagePress = (url: string) => {
-    setPreviewImageUrl(url);
+  const handleImagePress = (media: { url: string; type?: string }[], index: number) => {
+    setPreviewMedia(media);
+    setPreviewImageIndex(index);
     setIsImageViewerVisible(true);
   };
 
@@ -992,12 +994,14 @@ function AppContent() {
       
       <BottomNavigation activeTab={mainTab} onTabChange={(tab) => { setMainTab(tab); setViewingUserId(null); }} colors={colors} />
 
-      <ImageViewerModal
+      <MediaViewerModal
         visible={isImageViewerVisible}
-        imageUrl={previewImageUrl}
+        media={previewMedia}
+        initialIndex={previewImageIndex}
         onClose={() => {
           setIsImageViewerVisible(false);
-          setPreviewImageUrl(null);
+          setPreviewMedia([]);
+          setPreviewImageIndex(0);
         }}
       />
 

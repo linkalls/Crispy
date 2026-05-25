@@ -36,7 +36,7 @@ export function Note({
   onSharePress: () => void;
   onReactionPress: (index: number) => void;
   onUserPress?: (userId: string) => void;
-  onImagePress?: (url: string) => void;
+  onImagePress?: (media: { url: string; type?: string }[], index: number) => void;
 }) {
   return (
     <Pressable
@@ -111,8 +111,10 @@ export function Note({
                       <Pressable
                         onPress={(e) => {
                           e.stopPropagation();
+                          const mediaItems = note.files.filter(f => f.type?.startsWith('image/') || f.type?.startsWith('video/')).map(f => ({ url: resolveImagePreviewUrl(f.url, f.thumbnailUrl), type: f.type }));
+                          const mediaIndex = note.files.filter(f => f.type?.startsWith('image/') || f.type?.startsWith('video/')).findIndex(f => f.url === file.url);
                           const previewUrl = resolveImagePreviewUrl(file.url, file.thumbnailUrl);
-                          if (onImagePress) onImagePress(previewUrl);
+                          if (onImagePress) onImagePress(mediaItems, mediaIndex);
                           else Linking.openURL(previewUrl);
                         }}
                       >
@@ -164,8 +166,10 @@ export function Note({
                           <Pressable
                             onPress={(e) => {
                               e.stopPropagation();
+                              const mediaItems = note.quote!.files.filter(f => f.type?.startsWith('image/') || f.type?.startsWith('video/')).map(f => ({ url: resolveImagePreviewUrl(f.url, f.thumbnailUrl), type: f.type }));
+                              const mediaIndex = note.quote!.files.filter(f => f.type?.startsWith('image/') || f.type?.startsWith('video/')).findIndex(f => f.url === file.url);
                               const previewUrl = resolveImagePreviewUrl(file.url, file.thumbnailUrl);
-                              if (onImagePress) onImagePress(previewUrl);
+                              if (onImagePress) onImagePress(mediaItems, mediaIndex);
                               else Linking.openURL(previewUrl);
                             }}
                           >

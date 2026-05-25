@@ -26,7 +26,7 @@ export function ExploreScreen({
   onSharePress: (note: TimelineNote) => void;
   onReactionPress: (noteOrId: string | TimelineNote, index: number) => void;
   onUserPress?: (userId: string) => void;
-  onImagePress?: (url: string) => void;
+  onImagePress?: (media: { url: string; type?: string }[], index: number) => void;
 }) {
   const [query, setQuery] = useState('');
   const [notes, setNotes] = useState<TimelineNote[]>([]);

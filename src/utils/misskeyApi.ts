@@ -8,7 +8,5 @@ export function normalizeMisskeyEndpoint(path: string): string {
 }
 
 export function resolveImagePreviewUrl(url: string, thumbnailUrl?: string | null): string {
-  const trimmedThumbnail = thumbnailUrl?.trim();
-  if (trimmedThumbnail) return trimmedThumbnail;
   return url;
 }
