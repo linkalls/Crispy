@@ -13,6 +13,7 @@ import {
   Image,
   ScrollView,
   BackHandler,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -107,7 +108,7 @@ export function NoteComposerModal({
       return data?.id || null;
     } catch (e) {
       console.error('Image upload error:', e);
-      return null;
+      throw e; // We should throw it to surface the error rather than swallowing it and trying to submit the note without the file
     }
   };
 
@@ -136,8 +137,11 @@ export function NoteComposerModal({
       setVisibility('public');
       setImages([]);
       onClose();
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      // Pass the error to the onSubmit callback by triggering a fake rejection, or since onSubmit is our bridge to App.tsx, we can't easily bubble up.
+      // However, to alert the user, we can pass it through a rejected promise.
+      Alert.alert('投稿エラー', e.message);
     } finally {
       setSending(false);
     }

@@ -1007,10 +1007,16 @@ function AppContent() {
         onClose={() => setIsNoteComposerVisible(false)}
         onSubmit={async (text, cw, visibility, fileIds) => {
           try {
-            await misskeyRequest('/api/notes/create', { text, cw, visibility, fileIds: fileIds.length > 0 ? fileIds : undefined }, true);
+            // Exclude empty text if there are files attached, as Misskey fails if text is literally an empty string instead of undefined/null.
+            const payload: any = { visibility, fileIds: fileIds.length > 0 ? fileIds : undefined };
+            if (text.trim().length > 0) payload.text = text;
+            if (cw && cw.trim().length > 0) payload.cw = cw;
+
+            await misskeyRequest('/api/notes/create', payload, true);
             showToast('投稿しました');
-          } catch (e) {
-            showToast('投稿に失敗しました', undefined, true);
+          } catch (e: any) {
+            console.error(e);
+            showToast('投稿に失敗しました', e.message, true);
           }
         }}
       />

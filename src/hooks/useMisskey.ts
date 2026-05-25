@@ -136,18 +136,33 @@ export function useMisskey(activeAccount: StoredAccount | null) {
 
           for (const [key, value] of Object.entries(payload)) {
             if (value !== undefined && value !== null) {
-              formData.append(key, value as any);
+              if (key === 'file' && typeof value === 'object' && 'uri' in value) {
+                 // For React Native fetch blob, we pass it as a file directly with uri, name, type
+                 formData.append(key, value as any);
+              } else if (typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string') {
+                 formData.append(key, String(value));
+              } else {
+                 // For multipart/form-data, object arrays or objects usually need to be omitted or correctly handled.
+                 // The Misskey drive/files/create endpoint accepts: folderId, name, comment, isSensitive, force, file.
+                 // All of them are scalar strings or booleans except file.
+                 formData.append(key, String(value));
+              }
             }
           }
 
           const hostUrl = activeAccount.host.replace(/\/+$/, '');
+          // React Native needs no Content-Type header so it can set the multipart boundary automatically
           const res = await fetch(`https://${hostUrl}/api/${endpoint}`, {
             method: 'POST',
+            headers: {
+              // 'Content-Type': 'multipart/form-data', // DO NOT SET THIS, React Native needs to set boundary
+            },
             body: formData,
           });
 
           if (!res.ok) {
             const errBody = await res.text().catch(() => '');
+            console.error(`API Error on multipart: ${res.status} ${errBody}`);
             throw new Error(`API Error: ${res.status} ${errBody}`);
           }
           result = await res.json();
