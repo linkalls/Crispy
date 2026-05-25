@@ -1003,6 +1003,7 @@ function AppContent() {
         visible={isNoteComposerVisible}
         colors={colors}
         activeAccount={activeAccount}
+        misskeyRequest={misskeyRequest}
         onClose={() => setIsNoteComposerVisible(false)}
         onSubmit={async (text, cw, visibility, fileIds) => {
           try {

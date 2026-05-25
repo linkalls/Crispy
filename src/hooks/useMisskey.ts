@@ -1,8 +1,18 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { StoredAccount } from "../utils/types";
 import * as mk from 'misskey-js';
+import { normalizeMisskeyEndpoint } from "../utils/misskeyApi";
 
 export function useMisskey(activeAccount: StoredAccount | null) {
+  const client = useMemo(() => {
+    if (!activeAccount) return null;
+    const hostUrl = activeAccount.host.replace(/\/+$/, '');
+    return new mk.api.APIClient({
+      origin: `https://${hostUrl}`,
+      credential: activeAccount.token || undefined,
+    });
+  }, [activeAccount]);
+
   const misskeyRequest = useCallback(
     async <T>(
       path: string,
@@ -13,8 +23,10 @@ export function useMisskey(activeAccount: StoredAccount | null) {
         throw new Error("先にログインしてください。");
       }
 
+      const endpoint = normalizeMisskeyEndpoint(path);
+
       if (activeAccount.token === 'mock_token') {
-        if (path === '/api/notes/children') {
+        if (endpoint === 'notes/children') {
           return [
             {
               id: 'mock_reply_1',
@@ -48,7 +60,7 @@ export function useMisskey(activeAccount: StoredAccount | null) {
             }
           ] as unknown as T;
         }
-        if (path === '/api/notes/search') {
+        if (endpoint === 'notes/search') {
           return [
             {
               id: 'mock_search_1',
@@ -67,7 +79,7 @@ export function useMisskey(activeAccount: StoredAccount | null) {
             }
           ] as unknown as T;
         }
-        if (path.includes('timeline')) {
+        if (endpoint.includes('timeline')) {
           return [
             {
               id: 'mock_note_1',
@@ -109,37 +121,19 @@ export function useMisskey(activeAccount: StoredAccount | null) {
         throw new Error("認証が必要です。");
       }
 
-      const hostUrl = activeAccount.host.replace(/\/+$/, '');
-      const cli = new mk.api.APIClient({
-        origin: `https://${hostUrl}`,
-        credential: activeAccount.token || undefined
-      });
-
-      const endpoint = path.replace(/^\/api\//, '');
-      // mk.api.APIClient falls back to GET if the endpoint is not registered in endpointReqTypes (which includes 'notes/local-timeline').
-      // To strictly use POST for all Misskey APIs, we bypass this issue by explicitly hitting the endpoint using fetch with POST if needed,
-      // or relying on our endpoint stripping. However, since misskey-js's `request` method has this bug, we use a custom POST call for missing endpoints.
-      const method = endpoint.startsWith('drive/files/') ? 'multipart/form-data' : 'application/json';
-      let result;
       try {
-        result = await cli.request(endpoint as any, payload as any);
-      } catch (e: any) {
-        if (e.message?.includes('Cannot GET')) {
-          // Fallback manual POST request if misskey-js made a GET request incorrectly
-          const res = await fetch(`https://${hostUrl}/api/${endpoint}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...payload, i: activeAccount.token })
-          });
-          if (!res.ok) throw new Error(`API Error: ${res.status}`);
-          result = await res.json();
-        } else {
-          throw e;
+        if (!client) {
+          throw new Error("Misskey APIクライアントを初期化できませんでした。");
         }
+        return await client.request(endpoint as any, payload as any);
+      } catch (e: any) {
+        if (e && typeof e === 'object' && mk.api.isAPIError(e)) {
+          throw new Error(e.message || `${e.code} (${e.id})`);
+        }
+        throw e;
       }
-      return (result || {}) as T;
     },
-    [activeAccount],
+    [activeAccount, client],
   );
 
   return { misskeyRequest };
