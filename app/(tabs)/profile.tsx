@@ -1,18 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  Image,
-  Pressable,
-  ActivityIndicator,
-  RefreshControl,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, FlatList, Image, Pressable, ActivityIndicator, RefreshControl, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { ColorScheme, StoredAccount, TimelineNote } from '../utils/types';
-import { mapNote } from '../utils/formatting';
-import { Note } from '../components/Note';
+import { useRouter } from 'expo-router';
+import { useGlobalState } from '../../src/context/GlobalState';
+import { useMisskey } from '../../src/hooks';
+import { Note } from '../../src/components/Note';
+import { TimelineNote } from '../../src/utils/types';
+import { mapNote } from '../../src/utils/formatting';
 
 type UserProfile = {
   id: string;
@@ -28,33 +22,11 @@ type UserProfile = {
   createdAt: string;
 };
 
-export function ProfileScreen({
-  colors,
-  activeAccount,
-  misskeyRequest,
-  onNotePress,
-  onReplyPress,
-  onRenotePress,
-  onSharePress,
-  onReactionPress,
-  viewingUserId,
-  onBack,
-  onUserPress,
-  onImagePress,
-}: {
-  colors: ColorScheme;
-  activeAccount: StoredAccount | null;
-  misskeyRequest: <T>(path: string, payload: Record<string, unknown>, requiresAuth?: boolean) => Promise<T>;
-  onNotePress?: (note: TimelineNote) => void;
-  onReplyPress?: (noteOrId: string | TimelineNote) => void;
-  onRenotePress?: (note: TimelineNote) => void;
-  onSharePress?: (note: TimelineNote) => void;
-  onReactionPress?: (noteOrId: string | TimelineNote, index: number) => void;
-  viewingUserId?: string | null;
-  onBack?: () => void;
-  onUserPress?: (userId: string) => void;
-  onImagePress?: (media: { url: string; thumbnailUrl?: string; type?: string }[], index: number) => void;
-}) {
+export default function ProfileScreen({ viewingUserId }: { viewingUserId?: string }) {
+  const router = useRouter();
+  const { activeAccount, colors } = useGlobalState();
+  const { misskeyRequest } = useMisskey(activeAccount);
+
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [notes, setNotes] = useState<TimelineNote[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,7 +42,6 @@ export function ProfileScreen({
 
     try {
       if (activeAccount.token === 'mock_token') {
-        // Mock profile
         setProfile({
           id: 'test',
           name: 'Test User',
@@ -84,7 +55,6 @@ export function ProfileScreen({
           notesCount: 256,
           createdAt: '2024-01-15T00:00:00Z',
         });
-        // Mock notes
         setNotes([
           {
             id: 'my_note_1',
@@ -96,21 +66,6 @@ export function ProfileScreen({
             reactions: [{ emoji: '👍', count: 3, reacted: false, isCustom: false }],
             replies: 1,
             renotes: 0,
-            files: [],
-            reply: null,
-            quote: null,
-            emojis: {},
-          },
-          {
-            id: 'my_note_2',
-            targetId: 'my_note_2',
-            content: 'ボトムナビゲーションとFABを追加しました。だいぶアプリらしくなってきた！',
-            createdAtLabel: '1日前',
-            user: { id: 'test', name: 'Test User', username: 'testuser', host: 'sushi.ski', avatar: activeAccount.avatarUrl },
-            renoteUser: null,
-            reactions: [{ emoji: '🎉', count: 5, reacted: true, isCustom: false }],
-            replies: 2,
-            renotes: 3,
             files: [],
             reply: null,
             quote: null,
@@ -142,67 +97,28 @@ export function ProfileScreen({
     loadProfile();
   }, [loadProfile]);
 
-  if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
+  const handleNotePress = (note: TimelineNote) => {
+    router.push(`/note/${note.id}`);
+  };
 
-
-  const handleReactionPress = (noteOrId: string | TimelineNote, index: number) => {
-    const noteId = typeof noteOrId === 'string' ? noteOrId : noteOrId.id;
-    let note = typeof noteOrId === 'string' ? notes.find(n => n.id === noteId) : noteOrId;
-    if (!note) return;
-
-    if (index !== -1) {
-      const target = note.reactions[index];
-      if (target) {
-        const nextReacted = !target.reacted;
-        setNotes(current =>
-          current.map(item => {
-            if (item.id !== noteId) return item;
-            const reactions = [...item.reactions];
-            reactions[index] = {
-              ...target,
-              reacted: nextReacted,
-              count: Math.max(0, target.count + (nextReacted ? 1 : -1)),
-            };
-            return { ...item, reactions };
-          })
-        );
-      }
-    }
-    if (onReactionPress) onReactionPress(note, index);
+  const handleUserPress = (userId: string) => {
+    if (userId === activeAccount?.userId) return; // already here
+    router.push(`/user/${userId}`);
   };
 
   const renderHeader = () => (
     <View>
-      {/* Banner */}
       <View style={[localStyles.bannerWrap, { backgroundColor: colors.primary }]}>
-        {onBack && (
-          <Pressable
-            style={localStyles.backButton}
-            onPress={onBack}
-          >
-            <Ionicons name="arrow-back" size={24} color="#fff" />
-          </Pressable>
-        )}
         {profile?.bannerUrl && (
           <Image source={{ uri: profile.bannerUrl }} style={localStyles.banner} />
         )}
       </View>
-
-      {/* Avatar overlapping banner */}
       <View style={localStyles.avatarWrap}>
         <Image
           source={{ uri: profile?.avatarUrl || activeAccount?.avatarUrl || 'https://api.dicebear.com/9.x/avataaars/svg?seed=default' }}
           style={[localStyles.avatar, { borderColor: colors.bg }]}
         />
       </View>
-
-      {/* Profile info */}
       <View style={[localStyles.infoWrap, { paddingTop: 48 }]}>
         <Text style={[localStyles.displayName, { color: colors.text }]}>
           {profile?.name || profile?.username || 'Unknown'}
@@ -210,14 +126,11 @@ export function ProfileScreen({
         <Text style={[localStyles.username, { color: colors.textMuted }]}>
           @{profile?.username}{profile?.host ? `@${profile.host}` : ''}
         </Text>
-
         {profile?.description && (
           <Text style={[localStyles.bio, { color: colors.text }]}>
             {profile.description}
           </Text>
         )}
-
-        {/* Stats */}
         <View style={localStyles.statsRow}>
           <Pressable style={localStyles.statItem} onPress={() => setActiveTab('following')}>
             <Text style={[localStyles.statNumber, { color: colors.text }]}>{profile?.followingCount ?? 0}</Text>
@@ -232,10 +145,7 @@ export function ProfileScreen({
             <Text style={[localStyles.statLabel, { color: colors.textMuted }]}>ノート</Text>
           </Pressable>
         </View>
-
-        {/* Divider */}
         <View style={[localStyles.divider, { backgroundColor: colors.border }]} />
-
         <View style={{ flexDirection: 'row', gap: 16, marginBottom: 12 }}>
           <Pressable onPress={() => setActiveTab('notes')}>
             <Text style={[localStyles.sectionTitle, { color: activeTab === 'notes' ? colors.primary : colors.textMuted }]}>投稿</Text>
@@ -258,20 +168,20 @@ export function ProfileScreen({
       replyText=""
       isSendingReply={false}
       colors={colors}
-      onPress={() => onNotePress?.(item)}
-      onReplyPress={() => onReplyPress?.(item)}
+      onPress={() => handleNotePress(item)}
+      onReplyPress={() => {}}
       onReplyTextChange={() => {}}
       onReplySubmit={() => {}}
-      onRenotePress={() => onRenotePress?.(item)}
-      onSharePress={() => onSharePress?.(item)}
-      onReactionPress={(index) => handleReactionPress(item, index)}
-      onUserPress={onUserPress}
-      onImagePress={onImagePress}
+      onRenotePress={() => {}}
+      onSharePress={() => {}}
+      onReactionPress={() => {}}
+      onUserPress={handleUserPress}
+      onImagePress={() => {}}
     />
   );
 
   const renderUser = ({ item }: { item: any }) => (
-    <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }} onPress={() => onUserPress?.(item.id)}>
+    <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }} onPress={() => handleUserPress(item.id)}>
       <Image source={{ uri: item.avatarUrl || 'https://api.dicebear.com/9.x/avataaars/svg?seed=default' }} style={{ width: 48, height: 48, borderRadius: 24 }} />
       <View style={{ flex: 1 }}>
         <Text style={{ color: colors.text, fontSize: 16, fontWeight: 'bold' }} numberOfLines={1}>{item.name || item.username}</Text>
@@ -280,6 +190,16 @@ export function ProfileScreen({
       </View>
     </Pressable>
   );
+
+  if (!activeAccount) return null;
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <FlatList
@@ -302,95 +222,18 @@ export function ProfileScreen({
 }
 
 const localStyles = StyleSheet.create({
-  bannerWrap: {
-    height: 150,
-    width: '100%',
-  },
-  banner: {
-    width: '100%',
-    height: '100%',
-  },
-  backButton: {
-    position: 'absolute',
-    top: 40,
-    left: 16,
-    zIndex: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarWrap: {
-    position: 'absolute',
-    top: 110,
-    left: 16,
-    zIndex: 10,
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 4,
-  },
-  infoWrap: {
-    paddingHorizontal: 16,
-  },
-  displayName: {
-    fontSize: 22,
-    fontWeight: '700',
-  },
-  username: {
-    fontSize: 14,
-    marginTop: 2,
-  },
-  bio: {
-    fontSize: 15,
-    lineHeight: 22,
-    marginTop: 12,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 24,
-    marginTop: 16,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  statNumber: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  statLabel: {
-    fontSize: 14,
-  },
-  divider: {
-    height: 1,
-    marginTop: 20,
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  noteCard: {
-    marginHorizontal: 16,
-    marginBottom: 10,
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  reactionChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
+  bannerWrap: { height: 150, width: '100%' },
+  banner: { width: '100%', height: '100%' },
+  avatarWrap: { position: 'absolute', top: 110, left: 16, zIndex: 10 },
+  avatar: { width: 80, height: 80, borderRadius: 40, borderWidth: 4 },
+  infoWrap: { paddingHorizontal: 16 },
+  displayName: { fontSize: 22, fontWeight: '700' },
+  username: { fontSize: 14, marginTop: 2 },
+  bio: { fontSize: 15, lineHeight: 22, marginTop: 12 },
+  statsRow: { flexDirection: 'row', gap: 24, marginTop: 16 },
+  statItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  statNumber: { fontSize: 16, fontWeight: '700' },
+  statLabel: { fontSize: 14 },
+  divider: { height: 1, marginTop: 20, marginBottom: 12 },
+  sectionTitle: { fontSize: 17, fontWeight: '700', marginBottom: 8 },
 });
