@@ -14,8 +14,15 @@ interface GlobalStateContextType {
   colors: ColorScheme;
   isReady: boolean;
 
+  // Global Viewers
+  isImageViewerVisible: boolean;
+  previewMedia: { url: string; thumbnailUrl?: string; type?: string }[];
+  previewImageIndex: number;
+
   // Actions
   setAccounts: React.Dispatch<React.SetStateAction<StoredAccount[]>>;
+  openImageViewer: (media: { url: string; thumbnailUrl?: string; type?: string }[], index: number) => void;
+  closeImageViewer: () => void;
   setActiveAccountId: React.Dispatch<React.SetStateAction<string | null>>;
   setDevMode: React.Dispatch<React.SetStateAction<boolean>>;
   setThemeMode: React.Dispatch<React.SetStateAction<'system' | 'light' | 'dark'>>;
@@ -31,6 +38,10 @@ export function GlobalStateProvider({ children }: { children: React.ReactNode })
   const [devMode, setDevMode] = useState(false);
   const [themeMode, setThemeMode] = useState<'system' | 'light' | 'dark'>('system');
   const [isReady, setIsReady] = useState(false);
+
+  const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
+  const [previewMedia, setPreviewMedia] = useState<{ url: string; thumbnailUrl?: string; type?: string }[]>([]);
+  const [previewImageIndex, setPreviewImageIndex] = useState(0);
 
   const systemColorScheme = useColorScheme();
 
@@ -96,6 +107,18 @@ export function GlobalStateProvider({ children }: { children: React.ReactNode })
     }
   }, [activeAccountId, accounts]);
 
+  const openImageViewer = useCallback((media: { url: string; thumbnailUrl?: string; type?: string }[], index: number) => {
+    setPreviewMedia(media);
+    setPreviewImageIndex(index);
+    setIsImageViewerVisible(true);
+  }, []);
+
+  const closeImageViewer = useCallback(() => {
+    setIsImageViewerVisible(false);
+    setPreviewMedia([]);
+    setPreviewImageIndex(0);
+  }, []);
+
   const value = {
     accounts,
     activeAccountId,
@@ -104,12 +127,17 @@ export function GlobalStateProvider({ children }: { children: React.ReactNode })
     themeMode,
     colors,
     isReady,
+    isImageViewerVisible,
+    previewMedia,
+    previewImageIndex,
     setAccounts,
     setActiveAccountId,
     setDevMode,
     setThemeMode,
     logoutCurrent,
     removeAccount,
+    openImageViewer,
+    closeImageViewer,
   };
 
   return <GlobalStateContext.Provider value={value}>{children}</GlobalStateContext.Provider>;

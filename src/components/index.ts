@@ -7,7 +7,7 @@ export * from "./ReplyComposer";
 export * from "./TabBar";
 export { Timeline } from "./Timeline";
 export { QuoteComposerModal } from "./QuoteComposerModal";
-export { NoteDetailModal } from "./NoteDetailModal";
+export { OldNoteDetailModal as NoteDetailModal } from "./NoteDetailModal";
 export { RenoteOptionsModal } from "./RenoteOptionsModal";
 export { ReactionPickerModal } from "./ReactionPickerModal";
 export * from "./ConfirmModal";

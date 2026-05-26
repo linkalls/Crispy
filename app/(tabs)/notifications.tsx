@@ -1,3 +1,4 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, FlatList, RefreshControl, Pressable, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -88,6 +89,7 @@ function timeAgo(dateStr: string): string {
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { activeAccount, colors } = useGlobalState();
   const { misskeyRequest } = useMisskey(activeAccount);
 
@@ -218,7 +220,7 @@ export default function NotificationsScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: 40 }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
       <FlatList
         data={notifications}
         keyExtractor={(item) => item.id}

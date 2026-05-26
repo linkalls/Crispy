@@ -22,7 +22,7 @@ import { mapNote } from "../utils/formatting";
 import { resolveImagePreviewUrl } from "../utils/misskeyApi";
 import * as mfm from "mfm-js";
 
-export function NoteDetailModal({
+export function OldNoteDetailModal({
   visible,
   note,
   colors,

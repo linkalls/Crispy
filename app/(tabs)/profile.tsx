@@ -1,8 +1,11 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, FlatList, Image, Pressable, ActivityIndicator, RefreshControl, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { Share } from 'react-native';
 import { useGlobalState } from '../../src/context/GlobalState';
+import { useInteractionState } from '../../src/context/InteractionState';
 import { useMisskey } from '../../src/hooks';
 import { Note } from '../../src/components/Note';
 import { TimelineNote } from '../../src/utils/types';
@@ -24,7 +27,9 @@ type UserProfile = {
 
 export default function ProfileScreen({ viewingUserId }: { viewingUserId?: string }) {
   const router = useRouter();
-  const { activeAccount, colors } = useGlobalState();
+  const insets = useSafeAreaInsets();
+  const { activeAccount, colors, openImageViewer } = useGlobalState();
+  const { openReactionPicker, openRenoteOptions, showToast } = useInteractionState();
   const { misskeyRequest } = useMisskey(activeAccount);
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -106,6 +111,36 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
     router.push(`/user/${userId}`);
   };
 
+  const handleShare = async (note: TimelineNote) => {
+    const noteUrl = `https://${note.user.host}/notes/${note.targetId}`;
+    try {
+      await Share.share({ message: noteUrl, url: noteUrl });
+    } catch (error) {
+      showToast('失敗', '共有を開始できませんでした。', true);
+    }
+  };
+
+  const handleReactionToggle = async (note: TimelineNote, index: number) => {
+    if (index === -1) {
+      openReactionPicker(note);
+      return;
+    }
+    const target = note.reactions[index];
+    if (!target) return;
+    try {
+      if (target.reacted) {
+        await misskeyRequest('/api/notes/reactions/delete', { noteId: note.targetId }, true);
+        showToast('成功', 'リアクションを解除しました。');
+      } else {
+        await misskeyRequest('/api/notes/reactions/create', { noteId: note.targetId, reaction: target.emoji }, true);
+        showToast('成功', 'リアクションしました。');
+      }
+      loadProfile(true);
+    } catch (error) {
+      showToast('失敗', error instanceof Error ? error.message : 'リアクションに失敗しました。', true);
+    }
+  };
+
   const renderHeader = () => (
     <View>
       <View style={[localStyles.bannerWrap, { backgroundColor: colors.primary }]}>
@@ -172,11 +207,11 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
       onReplyPress={() => {}}
       onReplyTextChange={() => {}}
       onReplySubmit={() => {}}
-      onRenotePress={() => {}}
-      onSharePress={() => {}}
-      onReactionPress={() => {}}
+      onRenotePress={() => openRenoteOptions(item)}
+      onSharePress={() => handleShare(item)}
+      onReactionPress={(index) => handleReactionToggle(item, index)}
       onUserPress={handleUserPress}
-      onImagePress={() => {}}
+      onImagePress={openImageViewer}
     />
   );
 
@@ -202,13 +237,12 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
   }
 
   return (
-    <FlatList
+    <FlatList contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 20 }}
       data={activeTab === 'notes' ? notes : activeTab === 'following' ? following : followers}
       keyExtractor={(item) => item.id}
       renderItem={activeTab === 'notes' ? renderNote : renderUser}
       ListHeaderComponent={renderHeader}
       style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={{ paddingBottom: 20 }}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={() => loadProfile(true)} tintColor={colors.primary} />
       }

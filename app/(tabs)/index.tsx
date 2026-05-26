@@ -1,10 +1,13 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState, useCallback, useEffect } from 'react';
 import { View, SafeAreaView, Pressable, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { Share } from 'react-native';
 import { useGlobalState } from '../../src/context/GlobalState';
+import { useInteractionState } from '../../src/context/InteractionState';
 import { useMisskey, useMisskeyStream } from '../../src/hooks';
-import { Timeline, TabBar } from '../../src/components';
+import { Timeline, TabBar, FAB } from '../../src/components';
 import { TimelineTab, TimelineNote } from '../../src/utils/types';
 import { mapNote } from '../../src/utils/formatting';
 import { styles } from '../../src/styles/styles';
@@ -14,7 +17,9 @@ const DEFAULT_HOST = "misskey.io";
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { activeAccount, colors } = useGlobalState();
+  const insets = useSafeAreaInsets();
+  const { activeAccount, colors, openImageViewer } = useGlobalState();
+  const { openReactionPicker, openRenoteOptions, setIsNoteComposerVisible, showToast, refreshTrigger } = useInteractionState();
   const { misskeyRequest } = useMisskey(activeAccount);
   const { isConnected, lastMessage } = useMisskeyStream(activeAccount);
 
@@ -60,7 +65,37 @@ export default function HomeScreen() {
 
   useEffect(() => {
     loadTimeline(false);
-  }, [activeAccount, activeTab]);
+  }, [activeAccount, activeTab, refreshTrigger]);
+
+  const handleShare = async (note: TimelineNote) => {
+    const noteUrl = `https://${note.user.host}/notes/${note.targetId}`;
+    try {
+      await Share.share({ message: noteUrl, url: noteUrl });
+    } catch (error) {
+      showToast('失敗', '共有を開始できませんでした。', true);
+    }
+  };
+
+  const handleReactionToggle = async (note: TimelineNote, index: number) => {
+    if (index === -1) {
+      openReactionPicker(note);
+      return;
+    }
+    const target = note.reactions[index];
+    if (!target) return;
+    try {
+      if (target.reacted) {
+        await misskeyRequest('/api/notes/reactions/delete', { noteId: note.targetId }, true);
+        showToast('成功', 'リアクションを解除しました。');
+      } else {
+        await misskeyRequest('/api/notes/reactions/create', { noteId: note.targetId, reaction: target.emoji }, true);
+        showToast('成功', 'リアクションしました。');
+      }
+      loadTimeline(true);
+    } catch (error) {
+      showToast('失敗', error instanceof Error ? error.message : 'リアクションに失敗しました。', true);
+    }
+  };
 
   useEffect(() => {
     if (lastMessage) {
@@ -85,7 +120,7 @@ export default function HomeScreen() {
   if (!activeAccount) return null;
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: colors.bg }]}>
+    <View style={[styles.screen, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
       <StatusBar style={colors.bg === "#ffffff" ? "light" : "dark"} />
 
       {/* Header component replacement logic */}
@@ -128,13 +163,14 @@ export default function HomeScreen() {
         onReplyPress={() => {}}
         onReplyTextChange={() => {}}
         onReplySubmit={() => {}}
-        onRenotePress={() => {}}
-        onSharePress={() => {}}
-        onReactionPress={() => {}}
+        onRenotePress={openRenoteOptions}
+        onSharePress={handleShare}
+        onReactionPress={(note, index) => handleReactionToggle(note, index)}
         onNotePress={handleNotePress}
         onUserPress={handleUserPress}
-        onImagePress={() => {}}
+        onImagePress={openImageViewer}
       />
-    </SafeAreaView>
+      <FAB onPress={() => setIsNoteComposerVisible(true)} colors={colors} />
+    </View>
   );
 }

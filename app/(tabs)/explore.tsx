@@ -1,16 +1,21 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState, useCallback } from 'react';
 import { View, TextInput, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import { Timeline } from '../../src/components/Timeline';
 import { ColorScheme, TimelineNote } from '../../src/utils/types';
 import { mapNote } from '../../src/utils/formatting';
 import { Ionicons } from '@expo/vector-icons';
+import { Share } from 'react-native';
 import { useGlobalState } from '../../src/context/GlobalState';
+import { useInteractionState } from '../../src/context/InteractionState';
 import { useMisskey } from '../../src/hooks';
 import { useRouter } from 'expo-router';
 
 export default function ExploreScreen() {
   const router = useRouter();
-  const { activeAccount, colors } = useGlobalState();
+  const insets = useSafeAreaInsets();
+  const { activeAccount, colors, openImageViewer } = useGlobalState();
+  const { openReactionPicker, openRenoteOptions, showToast } = useInteractionState();
   const { misskeyRequest } = useMisskey(activeAccount);
 
   const [query, setQuery] = useState('');
@@ -46,10 +51,40 @@ export default function ExploreScreen() {
     router.push(`/user/${userId}`);
   };
 
+  const handleShare = async (note: TimelineNote) => {
+    const noteUrl = `https://${note.user.host}/notes/${note.targetId}`;
+    try {
+      await Share.share({ message: noteUrl, url: noteUrl });
+    } catch (error) {
+      showToast('失敗', '共有を開始できませんでした。', true);
+    }
+  };
+
+  const handleReactionToggle = async (note: TimelineNote, index: number) => {
+    if (index === -1) {
+      openReactionPicker(note);
+      return;
+    }
+    const target = note.reactions[index];
+    if (!target) return;
+    try {
+      if (target.reacted) {
+        await misskeyRequest('/api/notes/reactions/delete', { noteId: note.targetId }, true);
+        showToast('成功', 'リアクションを解除しました。');
+      } else {
+        await misskeyRequest('/api/notes/reactions/create', { noteId: note.targetId, reaction: target.emoji }, true);
+        showToast('成功', 'リアクションしました。');
+      }
+      handleSearch();
+    } catch (error) {
+      showToast('失敗', error instanceof Error ? error.message : 'リアクションに失敗しました。', true);
+    }
+  };
+
   if (!activeAccount) return null;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: 40 }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
       <View style={[localStyles.searchBarContainer, { borderBottomColor: colors.border, backgroundColor: colors.cardBg }]}>
         <Ionicons name="search" size={20} color={colors.textMuted} style={localStyles.searchIcon} />
         <TextInput
@@ -82,11 +117,11 @@ export default function ExploreScreen() {
           onReplySubmit={() => {}}
           onNotePress={handleNotePress}
           onReplyPress={() => {}}
-          onRenotePress={() => {}}
-          onSharePress={() => {}}
-          onReactionPress={() => {}}
+          onRenotePress={openRenoteOptions}
+          onSharePress={handleShare}
+          onReactionPress={(note, index) => handleReactionToggle(note, index)}
           onUserPress={handleUserPress}
-          onImagePress={() => {}}
+          onImagePress={openImageViewer}
         />
       ) : searched ? (
         <View style={localStyles.center}>
