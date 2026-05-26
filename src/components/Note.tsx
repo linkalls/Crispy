@@ -249,6 +249,9 @@ export function Note({
               <Pressable style={styles.actionItem} onPress={onSharePress}>
                 <Ionicons name="share-social-outline" size={16} color={colors.textMuted} />
               </Pressable>
+              <Pressable style={styles.actionItem} onPress={() => onReactionPress(-1)}>
+                <Ionicons name="add-outline" size={16} color={colors.textMuted} />
+              </Pressable>
             </View>
           </View>
 
