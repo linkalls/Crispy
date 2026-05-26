@@ -1,6 +1,6 @@
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, SafeAreaView, Pressable, Text } from 'react-native';
+import { View, Pressable, Text, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Share } from 'react-native';
@@ -129,16 +129,11 @@ export default function HomeScreen() {
           style={({ pressed }) => [styles.headerAccountButton, pressed && styles.buttonPressed]}
           onPress={() => router.push('/settings')}
         >
-          <View style={undefined}>
-            {activeAccount.avatarUrl ? (
-              <View style={undefined}>
-                 {/* Temporary avatar replacement until we fix Avatar */}
-                 <View style={{width:32,height:32,borderRadius:16,backgroundColor:colors.primary}} />
-              </View>
-            ) : (
-              <Ionicons name="person-circle" size={32} color={colors.textMuted} />
-            )}
-          </View>
+          {activeAccount.avatarUrl ? (
+            <Image source={{ uri: activeAccount.avatarUrl }} style={styles.headerAvatar} />
+          ) : (
+            <Ionicons name="person-circle" size={32} color={colors.textMuted} />
+          )}
           <View>
             <Text style={[styles.headerAppName, { color: colors.primaryText }]}>Crispy</Text>
             <Text style={[styles.headerName, { color: colors.text }]}>{activeAccount.displayName}</Text>
@@ -169,6 +164,7 @@ export default function HomeScreen() {
         onNotePress={handleNotePress}
         onUserPress={handleUserPress}
         onImagePress={openImageViewer}
+        onReferencedNotePress={(noteId) => router.push(`/note/${noteId}`)}
       />
       <FAB onPress={() => setIsNoteComposerVisible(true)} colors={colors} />
     </View>

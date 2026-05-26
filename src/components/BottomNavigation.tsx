@@ -15,7 +15,17 @@ export function BottomNavigation({
 }) {
   const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.bottomNav, { backgroundColor: colors.cardBg, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 8) }]}>
+    <View
+      style={[
+        styles.bottomNav,
+        {
+          backgroundColor: colors.cardBg,
+          borderTopColor: colors.border,
+          paddingBottom: Math.max(insets.bottom, 12),
+          paddingTop: 10,
+        },
+      ]}
+    >
       <Pressable style={styles.bottomNavTab} onPress={() => onTabChange('home')}>
         <Ionicons name={activeTab === 'home' ? 'home' : 'home-outline'} size={24} color={activeTab === 'home' ? colors.text : colors.textMuted} />
       </Pressable>

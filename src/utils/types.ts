@@ -7,6 +7,7 @@ export type MisskeyUser = {
   username: string;
   host?: string | null;
   avatarUrl?: string | null;
+  emojis?: Array<{ name: string; url: string }>;
 };
 
 export type MisskeyFile = {

@@ -226,7 +226,8 @@ export default function NotificationsScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderNotification}
         style={{ flex: 1, backgroundColor: colors.bg }}
-        contentContainerStyle={{ paddingBottom: 20 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 96 }}
+        scrollIndicatorInsets={{ bottom: insets.bottom + 96 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={() => loadNotifications(true)} tintColor={colors.primary} />
         }

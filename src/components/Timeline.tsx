@@ -22,6 +22,7 @@ export function Timeline({
   onNotePress,
   onUserPress,
   onImagePress,
+  onReferencedNotePress,
 }: {
   notes: TimelineNote[];
   isLoading: boolean;
@@ -41,6 +42,7 @@ export function Timeline({
   onNotePress?: (note: TimelineNote) => void;
   onUserPress?: (userId: string) => void;
   onImagePress?: (media: { url: string; thumbnailUrl?: string; type?: string }[], index: number) => void;
+  onReferencedNotePress?: (noteId: string) => void;
 }) {
   if (isLoading) {
     return (
@@ -58,8 +60,10 @@ export function Timeline({
       data={notes}
       keyExtractor={(item) => item.id}
       style={styles.timeline}
+      contentContainerStyle={{ paddingBottom: 96 }}
       refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
       showsVerticalScrollIndicator={false}
+      scrollIndicatorInsets={{ bottom: 96 }}
       initialNumToRender={10}
       maxToRenderPerBatch={10}
       windowSize={5}
@@ -107,6 +111,7 @@ export function Timeline({
           onReactionPress={(index) => onReactionPress(note, index)}
           onUserPress={onUserPress}
           onImagePress={onImagePress}
+          onReferencedNotePress={onReferencedNotePress}
         />
       )}
     />

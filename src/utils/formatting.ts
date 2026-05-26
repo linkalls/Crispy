@@ -1,4 +1,5 @@
 import { MisskeyNote, TimelineNote } from "./types";
+import { buildMisskeyEmojiMap, resolveMisskeyEmojiUrl } from "./misskeyApi";
 
 const DEFAULT_AVATAR =
   "https://api.dicebear.com/9.x/avataaars/svg?seed=Crispy&backgroundColor=b6e3f4";
@@ -38,36 +39,17 @@ export function mapNote(note: MisskeyNote, fallbackHost: string): TimelineNote {
   const quoteNote = (!isPureRenote && note.renote) ? mapNote(note.renote, fallbackHost) : null;
 
   // カスタム絵文字のマップを作成
-  const emojiMap: Record<string, string> = {};
   const noteEmojis = Array.isArray(note.emojis) ? note.emojis : [];
   const targetEmojis = Array.isArray(target.emojis) ? target.emojis : [];
-  const allEmojis = [...noteEmojis, ...targetEmojis];
-  allEmojis.forEach((e) => {
-    if (e.name && e.url) {
-      emojiMap[e.name] = e.url;
-      emojiMap[`:${e.name}:`] = e.url;
-    }
-  });
-
-  if (target.reactionEmojis) {
-    Object.entries(target.reactionEmojis).forEach(([name, url]) => {
-      emojiMap[name] = url;
-      emojiMap[`:${name}:`] = url;
-    });
-  }
+  const noteUserEmojis = Array.isArray(note.user.emojis) ? note.user.emojis : [];
+  const targetUserEmojis = Array.isArray(target.user.emojis) ? target.user.emojis : [];
+  const emojiMap = buildMisskeyEmojiMap(
+    [...noteEmojis, ...targetEmojis, ...noteUserEmojis, ...targetUserEmojis],
+    target.reactionEmojis,
+  );
 
   const reactions = Object.entries(target.reactions || {}).map(([emoji, count]) => {
-    let reactionEmojiUrl = emojiMap[emoji] || emojiMap[emoji.replace(/:/g, '')];
-
-    // Fallback for emojis containing '@'
-    if (!reactionEmojiUrl && emoji.startsWith(':') && emoji.endsWith(':')) {
-      const nameWithoutColons = emoji.slice(1, -1);
-      const parts = nameWithoutColons.split('@');
-      if (parts.length === 2) {
-        const baseName = parts[0];
-        reactionEmojiUrl = emojiMap[baseName] || emojiMap[`:${baseName}:`];
-      }
-    }
+    const reactionEmojiUrl = resolveMisskeyEmojiUrl(emojiMap, emoji);
 
     return {
       emoji,
