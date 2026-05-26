@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Modal, View, Image, StyleSheet, Platform, BackHandler } from 'react-native';
+import { Modal, View, Image, StyleSheet, Platform, BackHandler, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Video, ResizeMode } from 'expo-av';
@@ -20,6 +20,7 @@ export interface MediaViewerModalProps {
 
 export function MediaViewerModal({ visible, media, initialIndex = 0, onClose }: MediaViewerModalProps) {
   const insets = useSafeAreaInsets();
+  const { width, height } = Dimensions.get('window');
 
   useEffect(() => {
     if (Platform.OS === 'android' && visible) {
@@ -64,10 +65,10 @@ export function MediaViewerModal({ visible, media, initialIndex = 0, onClose }: 
             const item = media.find(m => m.url === props.source.uri);
             if (item && isVideo(item)) {
               return (
-                <View style={props.style}>
+                <View style={{ width, height }}>
                   <Video
                     source={{ uri: item.url }}
-                    style={{ width: '100%', height: '100%' }}
+                    style={{ width, height }}
                     useNativeControls
                     resizeMode={ResizeMode.CONTAIN}
                     isLooping

@@ -111,7 +111,7 @@ export function Note({
                       <Pressable
                         onPress={(e) => {
                           e.stopPropagation();
-                          const mediaItems = note.files.filter(f => f.type?.startsWith('image/') || f.type?.startsWith('video/')).map(f => ({ url: f.url, thumbnailUrl: f.thumbnailUrl || undefined, type: f.type }));
+                          const mediaItems = note.files.filter(f => f.type?.startsWith('image/') || f.type?.startsWith('video/')).map(f => ({ url: f.url, thumbnailUrl: f.url, type: f.type }));
                           const mediaIndex = note.files.filter(f => f.type?.startsWith('image/') || f.type?.startsWith('video/')).findIndex(f => f.url === file.url);
                           const previewUrl = resolveImagePreviewUrl(file.url, file.thumbnailUrl);
                           if (onImagePress) onImagePress(mediaItems, mediaIndex);
@@ -166,7 +166,7 @@ export function Note({
                           <Pressable
                             onPress={(e) => {
                               e.stopPropagation();
-                              const mediaItems = note.quote!.files.filter(f => f.type?.startsWith('image/') || f.type?.startsWith('video/')).map(f => ({ url: f.url, thumbnailUrl: f.thumbnailUrl || undefined, type: f.type }));
+                              const mediaItems = note.quote!.files.filter(f => f.type?.startsWith('image/') || f.type?.startsWith('video/')).map(f => ({ url: f.url, thumbnailUrl: f.url, type: f.type }));
                               const mediaIndex = note.quote!.files.filter(f => f.type?.startsWith('image/') || f.type?.startsWith('video/')).findIndex(f => f.url === file.url);
                               const previewUrl = resolveImagePreviewUrl(file.url, file.thumbnailUrl);
                               if (onImagePress) onImagePress(mediaItems, mediaIndex);
@@ -248,6 +248,9 @@ export function Note({
               </Pressable>
               <Pressable style={styles.actionItem} onPress={onSharePress}>
                 <Ionicons name="share-social-outline" size={16} color={colors.textMuted} />
+              </Pressable>
+              <Pressable style={styles.actionItem} onPress={() => onReactionPress(-1)}>
+                <Ionicons name="add-outline" size={16} color={colors.textMuted} />
               </Pressable>
             </View>
           </View>

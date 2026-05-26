@@ -1,48 +1,31 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  Image,
-  Pressable,
-  ActivityIndicator,
-  RefreshControl,
-  StyleSheet,
-} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, FlatList, RefreshControl, Pressable, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { ColorScheme, StoredAccount } from '../utils/types';
+import { useGlobalState } from '../../src/context/GlobalState';
+import { useMisskey } from '../../src/hooks';
+import { ColorScheme, StoredAccount } from '../../src/utils/types';
+import { useRouter } from 'expo-router';
 
-type MisskeyUser = {
-  id: string;
-  name?: string | null;
-  username: string;
-  host?: string | null;
-  avatarUrl?: string | null;
-};
-
-type MisskeyNotification = {
+// Defining inline interface since MisskeyNotification isn't exported from types
+interface MisskeyNotification {
   id: string;
   type: string;
   createdAt: string;
-  user?: MisskeyUser;
-  note?: {
-    id: string;
-    text?: string | null;
-  };
+  user?: any;
+  note?: { id: string; text: string | null };
   reaction?: string;
-  reactions?: Array<{
-    user: MisskeyUser;
-    reaction: string;
-  }>;
-  users?: Array<MisskeyUser>;
+  reactions?: Array<{ user: any; reaction: string }>;
+  users?: any[];
   header?: string;
-};
+}
 
 function getNotificationIcon(type: string): { name: string; color: string } {
-  if (type.startsWith('reaction')) return { name: 'heart', color: '#ff6b6b' };
-  if (type.startsWith('renote')) return { name: 'repeat', color: '#51cf66' };
+  if (type.startsWith('reaction')) return { name: 'heart', color: '#f03e3e' };
+  if (type.startsWith('renote')) return { name: 'repeat', color: '#20c997' };
   switch (type) {
     case 'app':
+      return { name: 'information-circle', color: '#4dabf7' };
     case 'login':
       return { name: 'information-circle', color: '#4dabf7' };
     case 'reply':
@@ -104,19 +87,12 @@ function timeAgo(dateStr: string): string {
   return `${days}日前`;
 }
 
-export function NotificationsScreen({
-  colors,
-  activeAccount,
-  misskeyRequest,
-  onNotificationPress,
-  onUserPress,
-}: {
-  colors: ColorScheme;
-  activeAccount: StoredAccount | null;
-  misskeyRequest: <T>(path: string, payload: Record<string, unknown>, requiresAuth?: boolean) => Promise<T>;
-  onNotificationPress?: (noteId: string) => void;
-  onUserPress?: (userId: string) => void;
-}) {
+export default function NotificationsScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { activeAccount, colors } = useGlobalState();
+  const { misskeyRequest } = useMisskey(activeAccount);
+
   const [notifications, setNotifications] = useState<MisskeyNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -127,8 +103,6 @@ export function NotificationsScreen({
     else setLoading(true);
 
     try {
-      // Mock data for test account
-      // Not mocking if we have a real token, but test account is gone. Let's just always request if no mock_token
       if (activeAccount.token === 'mock_token') {
         setNotifications([
           {
@@ -136,8 +110,8 @@ export function NotificationsScreen({
             type: 'reaction:grouped',
             createdAt: new Date(Date.now() - 60000).toISOString(),
             reactions: [
-              { user: { id: 'u0', name: 'Zack', username: 'zack', avatarUrl: 'https://sushi.ski/identicon/zack' }, reaction: '❤️' },
-              { user: { id: 'u1', name: 'Alice', username: 'alice', avatarUrl: 'https://sushi.ski/identicon/alice' }, reaction: '❤️' },
+              { user: { id: 'u0', name: 'Zack', username: 'zack', avatarUrl: 'https://api.dicebear.com/9.x/avataaars/svg?seed=zack' }, reaction: '❤️' },
+              { user: { id: 'u1', name: 'Alice', username: 'alice', avatarUrl: 'https://api.dicebear.com/9.x/avataaars/svg?seed=alice' }, reaction: '❤️' },
             ],
             note: { id: 'n0', text: 'すごい！' },
           },
@@ -145,36 +119,9 @@ export function NotificationsScreen({
             id: 'notif_1',
             type: 'reaction',
             createdAt: new Date(Date.now() - 120000).toISOString(),
-            user: { id: 'u1', name: 'Alice', username: 'alice', avatarUrl: 'https://sushi.ski/identicon/alice', host: null },
+            user: { id: 'u1', name: 'Alice', username: 'alice', avatarUrl: 'https://api.dicebear.com/9.x/avataaars/svg?seed=alice', host: null },
             note: { id: 'n1', text: 'これはUIテスト用のモックノートです！' },
             reaction: '👍',
-          },
-          {
-            id: 'notif_2',
-            type: 'follow',
-            createdAt: new Date(Date.now() - 3600000).toISOString(),
-            user: { id: 'u2', name: 'Bob', username: 'bob', avatarUrl: 'https://sushi.ski/identicon/bob', host: 'misskey.io' },
-          },
-          {
-            id: 'notif_3',
-            type: 'reply',
-            createdAt: new Date(Date.now() - 7200000).toISOString(),
-            user: { id: 'u3', name: 'Carol', username: 'carol', avatarUrl: 'https://sushi.ski/identicon/carol', host: null },
-            note: { id: 'n2', text: 'いいですね！私もそう思います。' },
-          },
-          {
-            id: 'notif_4',
-            type: 'renote',
-            createdAt: new Date(Date.now() - 86400000).toISOString(),
-            user: { id: 'u4', name: 'Dave', username: 'dave', avatarUrl: 'https://sushi.ski/identicon/dave', host: null },
-            note: { id: 'n3', text: 'Crispy開発中です！' },
-          },
-          {
-            id: 'notif_5',
-            type: 'mention',
-            createdAt: new Date(Date.now() - 172800000).toISOString(),
-            user: { id: 'u5', name: 'Eve', username: 'eve', avatarUrl: 'https://sushi.ski/identicon/eve', host: 'example.com' },
-            note: { id: 'n4', text: '@testuser このアプリすごいですね！' },
           },
         ]);
       } else {
@@ -230,12 +177,12 @@ export function NotificationsScreen({
     return (
       <Pressable
         style={[localStyles.notifItem, { borderBottomColor: colors.border }]}
-        onPress={() => { if (item.note?.id) onNotificationPress?.(item.note.id); }}
+        onPress={() => { if (item.note?.id) router.push(`/note/${item.note.id}`); }}
       >
         <View style={localStyles.iconWrap}>
           <Ionicons name={icon.name as any} size={20} color={icon.color} />
         </View>
-        <Pressable onPress={() => { if (targetUser?.id) onUserPress?.(targetUser.id); }}>
+        <Pressable onPress={() => { if (targetUser?.id) router.push(`/user/${targetUser.id}`); }}>
           <Image
             source={{ uri: targetUser?.avatarUrl || 'https://api.dicebear.com/9.x/avataaars/svg?seed=default' }}
             style={localStyles.avatar}
@@ -262,31 +209,35 @@ export function NotificationsScreen({
     );
   };
 
+  if (!activeAccount) return null;
+
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg }}>
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <FlatList
-      data={notifications}
-      keyExtractor={(item) => item.id}
-      renderItem={renderNotification}
-      style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={{ paddingBottom: 20 }}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => loadNotifications(true)} tintColor={colors.primary} />
-      }
-      ListEmptyComponent={
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 80 }}>
-          <Ionicons name="notifications-off-outline" size={48} color={colors.textMuted} />
-          <Text style={{ color: colors.textMuted, marginTop: 12, fontSize: 16 }}>通知はありません</Text>
-        </View>
-      }
-    />
+    <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}>
+      <FlatList
+        data={notifications}
+        keyExtractor={(item) => item.id}
+        renderItem={renderNotification}
+        style={{ flex: 1, backgroundColor: colors.bg }}
+        contentContainerStyle={{ paddingBottom: 20 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => loadNotifications(true)} tintColor={colors.primary} />
+        }
+        ListEmptyComponent={
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 80 }}>
+            <Ionicons name="notifications-off-outline" size={48} color={colors.textMuted} />
+            <Text style={{ color: colors.textMuted, marginTop: 12, fontSize: 16 }}>通知はありません</Text>
+          </View>
+        }
+      />
+    </View>
   );
 }
 
