@@ -1,19 +1,16 @@
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, Image, Pressable, ActivityIndicator, RefreshControl, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Share } from 'react-native';
 import * as mfm from 'mfm-js';
-import { useGlobalState } from '../../src/context/GlobalState';
-import { useInteractionState } from '../../src/context/InteractionState';
-import { useMisskey } from '../../src/hooks';
-import { Note } from '../../src/components/Note';
-import { TimelineNote } from '../../src/utils/types';
-import { mapNote, toggleNoteReactionLocally, incrementNoteRenoteLocally } from '../../src/utils/formatting';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Image, Pressable, RefreshControl, Share, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MfmRenderer } from '../../src/components/MfmRenderer';
+import { Note } from '../../src/components/Note';
+import { useGlobalState } from '../../src/context/GlobalState';
+import { globalEvents, useInteractionState } from '../../src/context/InteractionState';
+import { useMisskey } from '../../src/hooks';
+import { incrementNoteRenoteLocally, mapNote, toggleNoteReactionLocally } from '../../src/utils/formatting';
 import { buildMisskeyEmojiMap, buildMisskeyUserLookup, normalizeMisskeyReactionInput } from '../../src/utils/misskeyApi';
-import { globalEvents } from '../../src/context/InteractionState';
+import { TimelineNote } from '../../src/utils/types';
 
 type UserProfile = {
   id: string;
@@ -44,6 +41,8 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
   const [activeTab, setActiveTab] = useState<'notes' | 'following' | 'followers'>('notes');
   const [following, setFollowing] = useState<any[]>([]);
   const [followers, setFollowers] = useState<any[]>([]);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
   const profileEmojiMap = buildMisskeyEmojiMap(profile?.emojis);
   const profileName = profile?.name || profile?.username || 'Unknown';
 
@@ -107,7 +106,12 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
           setFollowing(followingRes.value.map((f: any) => f.followee ?? f).filter(Boolean));
         }
         if (followersRes.status === 'fulfilled' && Array.isArray(followersRes.value)) {
-          setFollowers(followersRes.value.map((f: any) => f.follower ?? f).filter(Boolean));
+          const followerList = followersRes.value.map((f: any) => f.follower ?? f).filter(Boolean);
+          setFollowers(followerList);
+          // Determine whether the active account already follows this profile
+          if (activeAccount) {
+            setIsFollowing(followerList.some((u: any) => u.id === activeAccount.userId));
+          }
         }
       }
     } catch (e) {
@@ -117,6 +121,46 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
       setRefreshing(false);
     }
   }, [activeAccount, misskeyRequest, viewingUserId]);
+
+  const handleFollowToggle = async () => {
+    if (!activeAccount || !profile) return;
+    const currentlyFollowing = isFollowing;
+    try {
+      // optimistic
+      setIsFollowing(!currentlyFollowing);
+      if (currentlyFollowing) {
+        await misskeyRequest('/api/following/delete', { userId: profile.id }, true);
+        setProfile(p => p ? { ...p, followersCount: (p.followersCount ?? 1) - 1 } : p);
+        showToast('成功', 'フォローを解除しました。');
+      } else {
+        await misskeyRequest('/api/following/create', { userId: profile.id }, true);
+        setProfile(p => p ? { ...p, followersCount: (p.followersCount ?? 0) + 1 } : p);
+        showToast('成功', 'フォローしました。');
+      }
+    } catch (error) {
+      // revert
+      setIsFollowing(currentlyFollowing);
+      showToast('失敗', error instanceof Error ? error.message : '操作に失敗しました。', true);
+    }
+  };
+
+  const handleBlockToggle = async () => {
+    if (!activeAccount || !profile) return;
+    const currentlyBlocked = isBlocked;
+    try {
+      setIsBlocked(!currentlyBlocked);
+      if (currentlyBlocked) {
+        await misskeyRequest('/api/blocking/delete', { userId: profile.id }, true);
+        showToast('成功', 'ブロックを解除しました。');
+      } else {
+        await misskeyRequest('/api/blocking/create', { userId: profile.id }, true);
+        showToast('成功', 'ユーザーをブロックしました。');
+      }
+    } catch (error) {
+      setIsBlocked(currentlyBlocked);
+      showToast('失敗', error instanceof Error ? error.message : '操作に失敗しました。', true);
+    }
+  };
 
   useEffect(() => {
     loadProfile();
@@ -232,6 +276,14 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
             <Text style={[localStyles.sectionTitle, { color: activeTab === 'followers' ? colors.primary : colors.textMuted }]}>フォロワー</Text>
           </Pressable>
         </View>
+        <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+          <Pressable onPress={handleFollowToggle} style={({ pressed }) => [{ backgroundColor: isFollowing ? colors.border : colors.primary, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 8, opacity: pressed ? 0.8 : 1 }]}>
+            <Text style={{ color: isFollowing ? colors.text : '#fff', fontWeight: '700' }}>{isFollowing ? 'フォロー解除' : 'フォロー'}</Text>
+          </Pressable>
+          <Pressable onPress={handleBlockToggle} style={({ pressed }) => [{ backgroundColor: isBlocked ? colors.border : '#ef4444', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 8, opacity: pressed ? 0.8 : 1 }]}>
+            <Text style={{ color: isBlocked ? colors.text : '#fff', fontWeight: '700' }}>{isBlocked ? 'ブロック解除' : 'ブロック'}</Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -244,9 +296,9 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
       isSendingReply={false}
       colors={colors}
       onPress={() => handleNotePress(item)}
-      onReplyPress={() => {}}
-      onReplyTextChange={() => {}}
-      onReplySubmit={() => {}}
+      onReplyPress={() => { }}
+      onReplyTextChange={() => { }}
+      onReplySubmit={() => { }}
       onRenotePress={() => openRenoteOptions(item)}
       onSharePress={() => handleShare(item)}
       onReactionPress={(index) => handleReactionToggle(item, index)}
@@ -259,20 +311,20 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
   const renderUser = ({ item }: { item: any }) => {
     if (!item) return null;
     return (
-    <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }} onPress={() => handleUserPress(item.id)}>
-      <Image source={{ uri: item.avatarUrl || 'https://api.dicebear.com/9.x/avataaars/svg?seed=default' }} style={{ width: 48, height: 48, borderRadius: 24 }} />
-      <View style={{ flex: 1 }}>
-        <MfmRenderer
-          nodes={mfm.parse(item.name || item.username || '')}
-          emojis={{ ...serverEmojiMap, ...buildMisskeyEmojiMap(item.emojis) }}
-          colors={colors}
-          textStyle={{ color: colors.text, fontSize: 16, fontWeight: 'bold' }}
-          emojiSize={18}
-        />
-        <Text style={{ color: colors.textMuted, fontSize: 14 }} numberOfLines={1}>@{item.username || ''}{item.host ? `@${item.host}` : ''}</Text>
-        {item.description && <Text style={{ color: colors.text, fontSize: 14, marginTop: 4 }} numberOfLines={2}>{item.description}</Text>}
-      </View>
-    </Pressable>
+      <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }} onPress={() => handleUserPress(item.id)}>
+        <Image source={{ uri: item.avatarUrl || 'https://api.dicebear.com/9.x/avataaars/svg?seed=default' }} style={{ width: 48, height: 48, borderRadius: 24 }} />
+        <View style={{ flex: 1 }}>
+          <MfmRenderer
+            nodes={mfm.parse(item.name || item.username || '')}
+            emojis={{ ...serverEmojiMap, ...buildMisskeyEmojiMap(item.emojis) }}
+            colors={colors}
+            textStyle={{ color: colors.text, fontSize: 16, fontWeight: 'bold' }}
+            emojiSize={18}
+          />
+          <Text style={{ color: colors.textMuted, fontSize: 14 }} numberOfLines={1}>@{item.username || ''}{item.host ? `@${item.host}` : ''}</Text>
+          {item.description && <Text style={{ color: colors.text, fontSize: 14, marginTop: 4 }} numberOfLines={2}>{item.description}</Text>}
+        </View>
+      </Pressable>
     );
   };
 
