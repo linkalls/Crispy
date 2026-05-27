@@ -182,7 +182,7 @@ export default function NotificationsScreen() {
         <View style={localStyles.iconWrap}>
           <Ionicons name={icon.name as any} size={20} color={icon.color} />
         </View>
-        <Pressable onPress={() => { if (targetUser?.id) router.push(`/user/${targetUser.id}`); }}>
+        <Pressable onPress={() => { if (targetUser?.id) router.push(`/user/${encodeURIComponent(targetUser.id)}`); }}>
           <Image
             source={{ uri: targetUser?.avatarUrl || 'https://api.dicebear.com/9.x/avataaars/svg?seed=default' }}
             style={localStyles.avatar}

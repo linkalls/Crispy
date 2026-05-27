@@ -16,7 +16,7 @@ export function resolveImagePreviewUrl(url: string, thumbnailUrl?: string | null
 export function normalizeMisskeyEmojiName(name: string): string {
   const trimmed = name.trim().replace(/^:+|:+$/g, "");
   if (!trimmed) return "";
-  return trimmed.split("@")[0] || trimmed;
+  return trimmed;
 }
 
 function isLikelyCustomReaction(value: string): boolean {
@@ -34,9 +34,10 @@ export function normalizeMisskeyReactionInput(reaction: string): string {
 function getMisskeyEmojiCandidates(name: string): string[] {
   const trimmed = name.trim();
   const normalized = normalizeMisskeyEmojiName(trimmed);
+  const hostless = normalized.split("@")[0] || normalized;
   const candidates = new Set<string>();
 
-  [trimmed, normalized].filter(Boolean).forEach((value) => {
+  [trimmed, normalized, hostless].filter(Boolean).forEach((value) => {
     const bare = value.replace(/^:+|:+$/g, "");
     if (!bare) return;
     candidates.add(value);
@@ -45,6 +46,23 @@ function getMisskeyEmojiCandidates(name: string): string[] {
   });
 
   return Array.from(candidates);
+}
+
+export function buildMisskeyUserLookup(identifier: string): { userId?: string; username?: string; host?: string } {
+  const trimmed = identifier.trim();
+  if (!trimmed) return {};
+
+  const normalized = trimmed.replace(/^@+/, "");
+  const parts = normalized.split("@").filter(Boolean);
+
+  if (parts.length >= 2) {
+    return {
+      username: parts[0],
+      host: parts.slice(1).join("@"),
+    };
+  }
+
+  return { userId: trimmed };
 }
 
 export function addMisskeyEmojiToMap(

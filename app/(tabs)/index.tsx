@@ -117,7 +117,7 @@ export default function HomeScreen() {
   };
 
   const handleUserPress = (userId: string) => {
-    router.push(`/user/${userId}`);
+    router.push(`/user/${encodeURIComponent(userId)}`);
   };
 
   if (!activeAccount) return null;
