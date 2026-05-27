@@ -2,8 +2,11 @@ import { useCallback, useMemo } from "react";
 import { StoredAccount } from "../utils/types";
 import * as mk from 'misskey-js';
 import { normalizeMisskeyEndpoint } from "../utils/misskeyApi";
+import { logError, logInfo } from "../utils/logger";
+import { useGlobalState } from "../context/GlobalState";
 
 export function useMisskey(activeAccount: StoredAccount | null) {
+  const { devMode } = useGlobalState();
   const client = useMemo(() => {
     if (!activeAccount) return null;
     const hostUrl = activeAccount.host.replace(/\/+$/, '');
@@ -162,7 +165,8 @@ export function useMisskey(activeAccount: StoredAccount | null) {
 
           if (!res.ok) {
             const errBody = await res.text().catch(() => '');
-            console.error(`API Error on multipart: ${res.status} ${errBody}`);
+            const errorMsg = `API Error on multipart: ${res.status} ${errBody}`;
+            await logError('misskeyRequest multipart error', errorMsg, devMode);
             throw new Error(`API Error: ${res.status} ${errBody}`);
           }
           result = await res.json();
@@ -172,13 +176,14 @@ export function useMisskey(activeAccount: StoredAccount | null) {
 
         return result as T;
       } catch (e: any) {
+        await logError(`misskeyRequest error for ${path}`, e, devMode);
         if (e && typeof e === 'object' && mk.api.isAPIError(e)) {
           throw new Error(e.message || `${e.code} (${e.id})`);
         }
         throw e;
       }
     },
-    [activeAccount, client],
+    [activeAccount, client, devMode],
   );
 
   return { misskeyRequest };

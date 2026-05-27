@@ -130,6 +130,15 @@ export default function SettingsScreen() {
               <Text style={[localStyles.rowText, { color: colors.text }]}>デベロッパーモード</Text>
               <Switch value={devMode} onValueChange={setDevMode} />
             </View>
+            {devMode && (
+              <Pressable
+                style={[localStyles.row, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}
+                onPress={() => router.push('/logs')}
+              >
+                <Text style={[localStyles.rowText, { color: colors.primary }]}>開発者ログを確認する</Text>
+                <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+              </Pressable>
+            )}
           </View>
         </View>
 
