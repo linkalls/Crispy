@@ -16,7 +16,7 @@ export function resolveImagePreviewUrl(url: string, thumbnailUrl?: string | null
 export function normalizeMisskeyEmojiName(name: string): string {
   const trimmed = name.trim().replace(/^:+|:+$/g, "");
   if (!trimmed) return "";
-  return trimmed;
+  return trimmed.split("@")[0] || trimmed;
 }
 
 function isLikelyCustomReaction(value: string): boolean {
@@ -34,10 +34,9 @@ export function normalizeMisskeyReactionInput(reaction: string): string {
 function getMisskeyEmojiCandidates(name: string): string[] {
   const trimmed = name.trim();
   const normalized = normalizeMisskeyEmojiName(trimmed);
-  const hostless = normalized.split("@")[0] || normalized;
   const candidates = new Set<string>();
 
-  [trimmed, normalized, hostless].filter(Boolean).forEach((value) => {
+  [trimmed, normalized].filter(Boolean).forEach((value) => {
     const bare = value.replace(/^:+|:+$/g, "");
     if (!bare) return;
     candidates.add(value);
