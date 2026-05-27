@@ -8,6 +8,7 @@ import { styles } from '../src/styles/styles';
 import { createSessionId, DEFAULT_HOST, normalizeHost } from '../src/utils/formatting';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { checkMiAuthSession } from '../src/utils/misskeyAuth';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -68,10 +69,7 @@ export default function SettingsScreen() {
 
       const result = await WebBrowser.openAuthSessionAsync(authUrl, returnUrl);
       if (result.type === 'success' && result.url) {
-        // Assume session verified, ideally this uses deep link handling similar to index.tsx
-        const res = await fetch(`https://${hostUrl}/api/miauth/${session}/check`, { method: 'POST' });
-        if (!res.ok) throw new Error('認証チェックに失敗しました');
-        const data = await res.json();
+        const data = await checkMiAuthSession(hostUrl, session);
         if (data.ok && data.token) {
           setAccounts((prev) => [
             ...prev,
@@ -136,6 +134,15 @@ export default function SettingsScreen() {
                 onPress={() => router.push('/logs')}
               >
                 <Text style={[localStyles.rowText, { color: colors.primary }]}>開発者ログを確認する</Text>
+                <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+              </Pressable>
+            )}
+            {devMode && (
+              <Pressable
+                style={[localStyles.row, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}
+                onPress={() => router.push('/api-explorer')}
+              >
+                <Text style={[localStyles.rowText, { color: colors.primary }]}>API Explorer を開く</Text>
                 <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
               </Pressable>
             )}

@@ -91,15 +91,24 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
           buildMisskeyUserLookup(targetUserIdentifier),
           true,
         );
-        const [userNotes, followingRes, followersRes] = await Promise.all([
+        setProfile(userInfo);
+
+        // Load notes, following, and followers independently so one failure doesn't block the others
+        const [userNotes, followingRes, followersRes] = await Promise.allSettled([
           misskeyRequest<any[]>('/api/users/notes', { userId: userInfo.id, limit: 20 }, true),
           misskeyRequest<any[]>('/api/users/following', { userId: userInfo.id, limit: 30 }, true),
           misskeyRequest<any[]>('/api/users/followers', { userId: userInfo.id, limit: 30 }, true),
         ]);
-        setProfile(userInfo);
-        setNotes(userNotes.map((n) => mapNote(n, activeAccount.host)));
-        setFollowing(followingRes.map((f: any) => f.followee));
-        setFollowers(followersRes.map((f: any) => f.follower));
+
+        if (userNotes.status === 'fulfilled' && Array.isArray(userNotes.value)) {
+          setNotes(userNotes.value.map((n) => mapNote(n, activeAccount.host)));
+        }
+        if (followingRes.status === 'fulfilled' && Array.isArray(followingRes.value)) {
+          setFollowing(followingRes.value.map((f: any) => f.followee ?? f).filter(Boolean));
+        }
+        if (followersRes.status === 'fulfilled' && Array.isArray(followersRes.value)) {
+          setFollowers(followersRes.value.map((f: any) => f.follower ?? f).filter(Boolean));
+        }
       }
     } catch (e) {
       console.error('Failed to load profile:', e);
@@ -247,22 +256,25 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
     />
   );
 
-  const renderUser = ({ item }: { item: any }) => (
+  const renderUser = ({ item }: { item: any }) => {
+    if (!item) return null;
+    return (
     <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }} onPress={() => handleUserPress(item.id)}>
       <Image source={{ uri: item.avatarUrl || 'https://api.dicebear.com/9.x/avataaars/svg?seed=default' }} style={{ width: 48, height: 48, borderRadius: 24 }} />
       <View style={{ flex: 1 }}>
         <MfmRenderer
-          nodes={mfm.parse(item.name || item.username)}
+          nodes={mfm.parse(item.name || item.username || '')}
           emojis={{ ...serverEmojiMap, ...buildMisskeyEmojiMap(item.emojis) }}
           colors={colors}
           textStyle={{ color: colors.text, fontSize: 16, fontWeight: 'bold' }}
           emojiSize={18}
         />
-        <Text style={{ color: colors.textMuted, fontSize: 14 }} numberOfLines={1}>@{item.username}{item.host ? `@${item.host}` : ''}</Text>
+        <Text style={{ color: colors.textMuted, fontSize: 14 }} numberOfLines={1}>@{item.username || ''}{item.host ? `@${item.host}` : ''}</Text>
         {item.description && <Text style={{ color: colors.text, fontSize: 14, marginTop: 4 }} numberOfLines={2}>{item.description}</Text>}
       </View>
     </Pressable>
-  );
+    );
+  };
 
   if (!activeAccount) return null;
 

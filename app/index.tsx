@@ -7,6 +7,7 @@ import { createSessionId, DEFAULT_HOST as DEFAULT_HOST_CONST, normalizeHost } fr
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { MisskeyMiAuthCheck, MisskeyUser } from '../src/utils/types';
+import { checkMiAuthSession } from '../src/utils/misskeyAuth';
 
 
 
@@ -33,9 +34,7 @@ export default function Index() {
     try {
       setOauthLoading(true);
       setOauthError(null);
-      const res = await fetch(`https://${host}/api/miauth/${session}/check`, { method: 'POST' });
-      if (!res.ok) throw new Error('認証チェックに失敗しました');
-      const data: MisskeyMiAuthCheck = await res.json();
+      const data: MisskeyMiAuthCheck = await checkMiAuthSession(host, session);
       if (data.ok && data.token) {
         setAccounts((prev) => {
           const exists = prev.find((a) => a.id === `${host}-${data.user.id}`);

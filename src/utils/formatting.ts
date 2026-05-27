@@ -1,5 +1,5 @@
-import { MisskeyNote, TimelineNote } from "./types";
-import { buildMisskeyEmojiMap, isSameMisskeyReaction, resolveMisskeyEmojiUrl } from "./misskeyApi";
+import type { MisskeyNote, TimelineNote } from "./types.ts";
+import { buildMisskeyEmojiMap, isSameMisskeyReaction, resolveMisskeyEmojiUrl } from "./misskeyApi.ts";
 
 const DEFAULT_AVATAR =
   "https://api.dicebear.com/9.x/avataaars/svg?seed=Crispy&backgroundColor=b6e3f4";
@@ -38,11 +38,16 @@ export function mapNote(note: MisskeyNote, fallbackHost: string): TimelineNote {
   // 引用元のノートをマップ（本文があるリノートの場合のみ）
   const quoteNote = (!isPureRenote && note.renote) ? mapNote(note.renote, fallbackHost) : null;
 
-  // カスタム絵文字のマップを作成
-  const noteEmojis = Array.isArray(note.emojis) ? note.emojis : [];
-  const targetEmojis = Array.isArray(target.emojis) ? target.emojis : [];
-  const noteUserEmojis = Array.isArray(note.user.emojis) ? note.user.emojis : [];
-  const targetUserEmojis = Array.isArray(target.user.emojis) ? target.user.emojis : [];
+  // カスタム絵文字のマップを作成 — handle both array and object formats
+  const toEmojiArray = (e: any): Array<{ name: string; url: string }> => {
+    if (Array.isArray(e)) return e;
+    if (e && typeof e === 'object') return Object.entries(e).map(([name, url]) => ({ name, url: url as string }));
+    return [];
+  };
+  const noteEmojis = toEmojiArray(note.emojis);
+  const targetEmojis = toEmojiArray(target.emojis);
+  const noteUserEmojis = toEmojiArray(note.user.emojis);
+  const targetUserEmojis = toEmojiArray(target.user.emojis);
   const emojiMap = buildMisskeyEmojiMap(
     [...noteEmojis, ...targetEmojis, ...noteUserEmojis, ...targetUserEmojis],
     target.reactionEmojis,

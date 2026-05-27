@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GlobalStateProvider, useGlobalState } from '../src/context/GlobalState';
 import { useInteractionState } from '../src/context/InteractionState';
 import { useMisskey } from '../src/hooks';
@@ -201,6 +202,7 @@ function RootStack() {
         <Stack.Screen name="index" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="api-explorer" options={{ presentation: 'modal' }} />
         <Stack.Screen name="user/[id]" options={{ presentation: 'card' }} />
         <Stack.Screen name="note/[id]" options={{ presentation: 'card' }} />
       </Stack>
@@ -211,8 +213,10 @@ function RootStack() {
 
 export default function RootLayout() {
   return (
-    <GlobalStateProvider>
-      <RootStack />
-    </GlobalStateProvider>
+    <SafeAreaProvider>
+      <GlobalStateProvider>
+        <RootStack />
+      </GlobalStateProvider>
+    </SafeAreaProvider>
   );
 }

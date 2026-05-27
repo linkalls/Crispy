@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { ActivityIndicator, Pressable, SafeAreaView, StatusBar, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StatusBar, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { styles } from '../styles/styles';
 
 export function AuthScreen({
@@ -16,7 +17,7 @@ export function AuthScreen({
   onLogin: () => void;
 }) {
   return (
-    <SafeAreaView style={styles.onboardingScreen}>
+    <SafeAreaView style={styles.onboardingScreen} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" />
       <View style={styles.onboardingCard}>
         <View style={styles.onboardingBrand}>

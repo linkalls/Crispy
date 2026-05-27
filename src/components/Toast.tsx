@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
-import { Animated, Text, StyleSheet, SafeAreaView } from "react-native";
+import { Animated, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { ColorScheme } from "../utils/types";
 
 export function Toast({
@@ -20,6 +21,7 @@ export function Toast({
 }) {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(-20)).current;
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (visible) {
@@ -60,7 +62,11 @@ export function Toast({
   if (!visible && (opacity as any)._value === 0) return null;
 
   return (
-    <SafeAreaView style={styles.container} pointerEvents="none">
+    <SafeAreaView
+      style={[styles.container, { bottom: Math.max(96, insets.bottom + 24) }]}
+      edges={['bottom']}
+      pointerEvents="none"
+    >
       <Animated.View
         style={[
           styles.toast,

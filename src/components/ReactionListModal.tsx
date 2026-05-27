@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Modal, View, Text, Pressable, StyleSheet, SafeAreaView, FlatList, Image, ActivityIndicator, Platform, BackHandler } from "react-native";
+import { Modal, View, Text, Pressable, StyleSheet, FlatList, Image, ActivityIndicator, Platform, BackHandler } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { ColorScheme, TimelineNote } from "../utils/types";
 
 export function ReactionListModal({
@@ -46,35 +47,37 @@ export function ReactionListModal({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={[styles.modalCard, { backgroundColor: colors.bg, borderColor: colors.border }]} onPress={(e) => e.stopPropagation()}>
-          <View style={[styles.header, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.title, { color: colors.text }]}>リアクションしたユーザー</Text>
-            <Pressable onPress={onClose} style={({ pressed }) => [pressed && { opacity: 0.7 }]}>
-              <Ionicons name="close" size={24} color={colors.text} />
-            </Pressable>
-          </View>
-          {loading ? (
-            <ActivityIndicator size="large" color={colors.primary} style={{ padding: 20 }} />
-          ) : (
-            <FlatList
-              data={reactions}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={{ padding: 12 }}
-              renderItem={({ item }) => (
-                <View style={styles.userRow}>
-                  <Image source={{ uri: item.user.avatarUrl }} style={styles.avatar} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{item.user.name || item.user.username}</Text>
-                    <Text style={[styles.username, { color: colors.textMuted }]} numberOfLines={1}>@{item.user.username}</Text>
+        <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
+          <Pressable style={[styles.modalCard, { backgroundColor: colors.bg, borderColor: colors.border }]} onPress={(e) => e.stopPropagation()}>
+            <View style={[styles.header, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.title, { color: colors.text }]}>リアクションしたユーザー</Text>
+              <Pressable onPress={onClose} style={({ pressed }) => [pressed && { opacity: 0.7 }]}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </Pressable>
+            </View>
+            {loading ? (
+              <ActivityIndicator size="large" color={colors.primary} style={{ padding: 20 }} />
+            ) : (
+              <FlatList
+                data={reactions}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={{ padding: 12 }}
+                renderItem={({ item }) => (
+                  <View style={styles.userRow}>
+                    <Image source={{ uri: item.user.avatarUrl }} style={styles.avatar} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{item.user.name || item.user.username}</Text>
+                      <Text style={[styles.username, { color: colors.textMuted }]} numberOfLines={1}>@{item.user.username}</Text>
+                    </View>
+                    <View style={[styles.reactionBadge, { backgroundColor: colors.reactionBg }]}>
+                      <Text style={{ fontSize: 16 }}>{item.type.replace('@.', '')}</Text>
+                    </View>
                   </View>
-                  <View style={[styles.reactionBadge, { backgroundColor: colors.reactionBg }]}>
-                    <Text style={{ fontSize: 16 }}>{item.type.replace('@.', '')}</Text>
-                  </View>
-                </View>
-              )}
-            />
-          )}
-        </Pressable>
+                )}
+              />
+            )}
+          </Pressable>
+        </SafeAreaView>
       </Pressable>
     </Modal>
   );

@@ -77,14 +77,21 @@ export function addMisskeyEmojiToMap(
 }
 
 export function buildMisskeyEmojiMap(
-  emojis?: Array<{ name: string; url: string }> | null,
+  emojis?: Array<{ name: string; url: string }> | Record<string, string> | null,
   reactionEmojis?: Record<string, string> | null,
 ): Record<string, string> {
   const emojiMap: Record<string, string> = {};
 
-  (emojis || []).forEach((emoji) => {
-    addMisskeyEmojiToMap(emojiMap, emoji.name, emoji.url);
-  });
+  if (Array.isArray(emojis)) {
+    emojis.forEach((emoji) => {
+      addMisskeyEmojiToMap(emojiMap, emoji.name, emoji.url);
+    });
+  } else if (emojis && typeof emojis === 'object') {
+    // Handle object format: { emojiName: url }
+    Object.entries(emojis).forEach(([name, url]) => {
+      addMisskeyEmojiToMap(emojiMap, name, url);
+    });
+  }
 
   Object.entries(reactionEmojis || {}).forEach(([name, url]) => {
     addMisskeyEmojiToMap(emojiMap, name, url);

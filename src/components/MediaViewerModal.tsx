@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { Modal, View, Image, StyleSheet, Platform, BackHandler, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Video, ResizeMode } from 'expo-av';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import ImageViewer from 'react-native-image-zoom-viewer';
 
 export interface MediaItem {
@@ -16,6 +16,15 @@ export interface MediaViewerModalProps {
   media: MediaItem[];
   initialIndex?: number;
   onClose: () => void;
+}
+
+function VideoSlide({ uri, style }: { uri: string; style: { width: number; height: number } }) {
+  const player = useVideoPlayer(uri, (playerInstance) => {
+    playerInstance.loop = true;
+    playerInstance.play();
+  });
+
+  return <VideoView style={style} player={player} nativeControls contentFit="contain" allowsPictureInPicture />;
 }
 
 export function MediaViewerModal({ visible, media, initialIndex = 0, onClose }: MediaViewerModalProps) {
@@ -66,14 +75,7 @@ export function MediaViewerModal({ visible, media, initialIndex = 0, onClose }: 
             if (item && isVideo(item)) {
               return (
                 <View style={{ width, height }}>
-                  <Video
-                    source={{ uri: item.url }}
-                    style={{ width, height }}
-                    useNativeControls
-                    resizeMode={ResizeMode.CONTAIN}
-                    isLooping
-                    shouldPlay
-                  />
+                  <VideoSlide uri={item.url} style={{ width, height }} />
                 </View>
               );
             }
