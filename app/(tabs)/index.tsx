@@ -9,8 +9,9 @@ import { useInteractionState } from '../../src/context/InteractionState';
 import { useMisskey, useMisskeyStream } from '../../src/hooks';
 import { Timeline, TabBar, FAB } from '../../src/components';
 import { TimelineTab, TimelineNote } from '../../src/utils/types';
-import { mapNote } from '../../src/utils/formatting';
+import { mapNote, toggleNoteReactionLocally, incrementNoteRenoteLocally } from '../../src/utils/formatting';
 import { normalizeMisskeyReactionInput } from '../../src/utils/misskeyApi';
+import { globalEvents } from '../../src/context/InteractionState';
 import { styles } from '../../src/styles/styles';
 import { StatusBar } from 'expo-status-bar';
 
@@ -68,6 +69,16 @@ export default function HomeScreen() {
     loadTimeline(false);
   }, [activeAccount, activeTab, refreshTrigger]);
 
+  useEffect(() => {
+    return globalEvents.on('noteUpdated', (payload) => {
+      if (payload.action === 'reaction') {
+        setNotes(prev => prev.map(n => n.id === payload.noteId ? toggleNoteReactionLocally(n, payload.emoji, payload.isReacting) : n));
+      } else if (payload.action === 'renote') {
+        setNotes(prev => prev.map(n => n.id === payload.noteId ? incrementNoteRenoteLocally(n) : n));
+      }
+    });
+  }, []);
+
   const handleShare = async (note: TimelineNote) => {
     const noteUrl = `https://${note.user.host}/notes/${note.targetId}`;
     try {
@@ -86,15 +97,16 @@ export default function HomeScreen() {
     if (!target) return;
     try {
       if (target.reacted) {
+        setNotes(prev => prev.map(n => n.id === note.id ? toggleNoteReactionLocally(n, target.emoji, false) : n));
         await misskeyRequest('/api/notes/reactions/delete', { noteId: note.targetId }, true);
         showToast('成功', 'リアクションを解除しました。');
       } else {
         const normalizedReaction = normalizeMisskeyReactionInput(target.emoji);
         if (!normalizedReaction) return;
+        setNotes(prev => prev.map(n => n.id === note.id ? toggleNoteReactionLocally(n, target.emoji, true) : n));
         await misskeyRequest('/api/notes/reactions/create', { noteId: note.targetId, reaction: normalizedReaction }, true);
         showToast('成功', 'リアクションしました。');
       }
-      loadTimeline(true);
     } catch (error) {
       showToast('失敗', error instanceof Error ? error.message : 'リアクションに失敗しました。', true);
     }

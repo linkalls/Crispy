@@ -1,10 +1,11 @@
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, TextInput, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import { Timeline } from '../../src/components/Timeline';
 import { ColorScheme, TimelineNote } from '../../src/utils/types';
-import { mapNote } from '../../src/utils/formatting';
+import { mapNote, toggleNoteReactionLocally, incrementNoteRenoteLocally } from '../../src/utils/formatting';
 import { normalizeMisskeyReactionInput } from '../../src/utils/misskeyApi';
+import { globalEvents } from '../../src/context/InteractionState';
 import { Ionicons } from '@expo/vector-icons';
 import { Share } from 'react-native';
 import { useGlobalState } from '../../src/context/GlobalState';
@@ -44,6 +45,16 @@ export default function ExploreScreen() {
     }
   }, [query, activeAccount, misskeyRequest]);
 
+  useEffect(() => {
+    return globalEvents.on('noteUpdated', (payload) => {
+      if (payload.action === 'reaction') {
+        setNotes(prev => prev.map(n => n.id === payload.noteId ? toggleNoteReactionLocally(n, payload.emoji, payload.isReacting) : n));
+      } else if (payload.action === 'renote') {
+        setNotes(prev => prev.map(n => n.id === payload.noteId ? incrementNoteRenoteLocally(n) : n));
+      }
+    });
+  }, []);
+
   const handleNotePress = (note: TimelineNote) => {
     router.push(`/note/${note.id}`);
   };
@@ -70,15 +81,16 @@ export default function ExploreScreen() {
     if (!target) return;
     try {
       if (target.reacted) {
+        setNotes(prev => prev.map(n => n.id === note.id ? toggleNoteReactionLocally(n, target.emoji, false) : n));
         await misskeyRequest('/api/notes/reactions/delete', { noteId: note.targetId }, true);
         showToast('成功', 'リアクションを解除しました。');
       } else {
         const normalizedReaction = normalizeMisskeyReactionInput(target.emoji);
         if (!normalizedReaction) return;
+        setNotes(prev => prev.map(n => n.id === note.id ? toggleNoteReactionLocally(n, target.emoji, true) : n));
         await misskeyRequest('/api/notes/reactions/create', { noteId: note.targetId, reaction: normalizedReaction }, true);
         showToast('成功', 'リアクションしました。');
       }
-      handleSearch();
     } catch (error) {
       showToast('失敗', error instanceof Error ? error.message : 'リアクションに失敗しました。', true);
     }

@@ -89,3 +89,54 @@ export function mapNote(note: MisskeyNote, fallbackHost: string): TimelineNote {
 
 export const DEFAULT_HOST = "misskey.io";
 export const STORAGE_KEY = "crispy:state:v2";
+
+export function toggleNoteReactionLocally(note: TimelineNote, emoji: string, isReacting: boolean): TimelineNote {
+  const newReactions = [...note.reactions];
+  const targetIndex = newReactions.findIndex(r => r.emoji === emoji);
+
+  if (targetIndex !== -1) {
+    const r = newReactions[targetIndex];
+    if (isReacting) {
+      if (!r.reacted) {
+        newReactions[targetIndex] = { ...r, count: r.count + 1, reacted: true };
+      }
+    } else {
+      if (r.reacted) {
+        newReactions[targetIndex] = { ...r, count: Math.max(0, r.count - 1), reacted: false };
+      }
+    }
+    // Remove if count goes to 0 (optional, but Misskey sometimes keeps it or drops it. We can drop if 0)
+    if (newReactions[targetIndex].count === 0) {
+      newReactions.splice(targetIndex, 1);
+    }
+  } else if (isReacting) {
+    // Add new reaction
+    newReactions.push({
+      emoji,
+      count: 1,
+      reacted: true,
+      isCustom: emoji.startsWith(':'),
+      // url might be missing if it's a custom emoji and we don't have the global map here,
+      // but MfmRenderer/Note can fallback or we just rely on existing cache.
+    });
+  }
+
+  return {
+    ...note,
+    reactions: newReactions,
+  };
+}
+
+export function incrementNoteRenoteLocally(note: TimelineNote): TimelineNote {
+  return {
+    ...note,
+    renotes: note.renotes + 1,
+  };
+}
+
+export function incrementNoteReplyLocally(note: TimelineNote): TimelineNote {
+  return {
+    ...note,
+    replies: note.replies + 1,
+  };
+}

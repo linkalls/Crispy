@@ -61,3 +61,23 @@ export const useInteractionState = create<InteractionState>((set) => ({
   refreshTrigger: 0,
   triggerRefresh: () => set((state) => ({ refreshTrigger: state.refreshTrigger + 1 })),
 }));
+
+// Global event emitter for optimistic UI updates across screens without heavy prop drilling.
+type EventCallback = (payload: any) => void;
+const listeners: Record<string, EventCallback[]> = {};
+
+export const globalEvents = {
+  on(event: string, callback: EventCallback) {
+    if (!listeners[event]) listeners[event] = [];
+    listeners[event].push(callback);
+    return () => this.off(event, callback);
+  },
+  off(event: string, callback: EventCallback) {
+    if (!listeners[event]) return;
+    listeners[event] = listeners[event].filter((cb) => cb !== callback);
+  },
+  emit(event: string, payload: any) {
+    if (!listeners[event]) return;
+    listeners[event].forEach((cb) => cb(payload));
+  },
+};

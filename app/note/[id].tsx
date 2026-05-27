@@ -8,8 +8,9 @@ import { useGlobalState } from "../../src/context/GlobalState";
 import { useInteractionState } from "../../src/context/InteractionState";
 import { useMisskey } from "../../src/hooks";
 import { TimelineNote, MisskeyNote } from "../../src/utils/types";
-import { mapNote } from "../../src/utils/formatting";
+import { mapNote, toggleNoteReactionLocally, incrementNoteRenoteLocally } from "../../src/utils/formatting";
 import { normalizeMisskeyReactionInput } from "../../src/utils/misskeyApi";
+import { globalEvents } from "../../src/context/InteractionState";
 import { Note, ReplyComposer } from "../../src/components";
 
 export default function NoteDetailScreen() {
@@ -68,6 +69,24 @@ export default function NoteDetailScreen() {
     fetchNoteAndReplies();
   }, [fetchNoteAndReplies, refreshTrigger]);
 
+  useEffect(() => {
+    return globalEvents.on('noteUpdated', (payload) => {
+      if (payload.action === 'reaction') {
+        if (payload.noteId === id) {
+          setNote(prev => prev ? toggleNoteReactionLocally(prev, payload.emoji, payload.isReacting) : prev);
+        } else {
+          setReplies(prev => prev.map(n => n.id === payload.noteId ? toggleNoteReactionLocally(n, payload.emoji, payload.isReacting) : n));
+        }
+      } else if (payload.action === 'renote') {
+        if (payload.noteId === id) {
+          setNote(prev => prev ? incrementNoteRenoteLocally(prev) : prev);
+        } else {
+          setReplies(prev => prev.map(n => n.id === payload.noteId ? incrementNoteRenoteLocally(n) : n));
+        }
+      }
+    });
+  }, [id]);
+
   const handleShare = async (note: TimelineNote) => {
     const noteUrl = `https://${note.user.host}/notes/${note.targetId}`;
     try {
@@ -86,15 +105,24 @@ export default function NoteDetailScreen() {
     if (!target) return;
     try {
       if (target.reacted) {
+        if (note.id === id) {
+          setNote(prev => prev ? toggleNoteReactionLocally(prev, target.emoji, false) : prev);
+        } else {
+          setReplies(prev => prev.map(n => n.id === note.id ? toggleNoteReactionLocally(n, target.emoji, false) : n));
+        }
         await misskeyRequest('/api/notes/reactions/delete', { noteId: note.targetId }, true);
         showToast('成功', 'リアクションを解除しました。');
       } else {
         const normalizedReaction = normalizeMisskeyReactionInput(target.emoji);
         if (!normalizedReaction) return;
+        if (note.id === id) {
+          setNote(prev => prev ? toggleNoteReactionLocally(prev, target.emoji, true) : prev);
+        } else {
+          setReplies(prev => prev.map(n => n.id === note.id ? toggleNoteReactionLocally(n, target.emoji, true) : n));
+        }
         await misskeyRequest('/api/notes/reactions/create', { noteId: note.targetId, reaction: normalizedReaction }, true);
         showToast('成功', 'リアクションしました。');
       }
-      fetchNoteAndReplies();
     } catch (error) {
       showToast('失敗', error instanceof Error ? error.message : 'リアクションに失敗しました。', true);
     }
