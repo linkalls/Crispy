@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useGlobalState } from '../src/context/GlobalState';
 import { styles } from '../src/styles/styles';
-import { createSessionId, DEFAULT_HOST } from '../src/utils/formatting';
+import { createSessionId, DEFAULT_HOST, normalizeHost } from '../src/utils/formatting';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 
@@ -61,7 +61,7 @@ export default function SettingsScreen() {
         return;
       }
 
-      const hostUrl = serverHostInput.trim().replace(/\/+$/, '');
+      const hostUrl = normalizeHost(serverHostInput);
       const session = createSessionId();
       const returnUrl = Linking.createURL('/oauth-callback');
       const authUrl = `https://${hostUrl}/miauth/${session}?name=Crispy&callback=${encodeURIComponent(returnUrl)}&permission=read:account,write:account,read:blocks,write:blocks,read:drive,write:drive,read:favorites,write:favorites,read:following,write:following,read:messaging,write:messaging,read:mutes,write:mutes,write:notes,read:notifications,write:notifications,read:reactions,write:reactions,write:votes,read:pages,write:pages,write:page-likes,read:page-likes,read:user-groups,write:user-groups,read:channels,write:channels,read:gallery,write:gallery,read:gallery-likes,write:gallery-likes`;
@@ -108,7 +108,12 @@ export default function SettingsScreen() {
         <View style={localStyles.headerIcon} />
       </View>
 
-      <ScrollView style={{ flex: 1 }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+        scrollIndicatorInsets={{ bottom: insets.bottom }}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={localStyles.section}>
           <Text style={[localStyles.sectionTitle, { color: colors.textMuted }]}>表示設定</Text>
           <View style={[localStyles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>

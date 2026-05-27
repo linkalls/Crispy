@@ -4,12 +4,15 @@ import { View, Text, FlatList, Image, Pressable, ActivityIndicator, RefreshContr
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Share } from 'react-native';
+import * as mfm from 'mfm-js';
 import { useGlobalState } from '../../src/context/GlobalState';
 import { useInteractionState } from '../../src/context/InteractionState';
 import { useMisskey } from '../../src/hooks';
 import { Note } from '../../src/components/Note';
 import { TimelineNote } from '../../src/utils/types';
 import { mapNote } from '../../src/utils/formatting';
+import { MfmRenderer } from '../../src/components/MfmRenderer';
+import { buildMisskeyEmojiMap } from '../../src/utils/misskeyApi';
 
 type UserProfile = {
   id: string;
@@ -19,6 +22,7 @@ type UserProfile = {
   avatarUrl?: string | null;
   bannerUrl?: string | null;
   description?: string | null;
+  emojis?: Array<{ name: string; url: string }>;
   followersCount: number;
   followingCount: number;
   notesCount: number;
@@ -39,6 +43,8 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
   const [activeTab, setActiveTab] = useState<'notes' | 'following' | 'followers'>('notes');
   const [following, setFollowing] = useState<any[]>([]);
   const [followers, setFollowers] = useState<any[]>([]);
+  const profileEmojiMap = buildMisskeyEmojiMap(profile?.emojis);
+  const profileName = profile?.name || profile?.username || 'Unknown';
 
   const loadProfile = useCallback(async (isRefresh = false) => {
     if (!activeAccount) return;
@@ -155,16 +161,23 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
         />
       </View>
       <View style={[localStyles.infoWrap, { paddingTop: 48 }]}>
-        <Text style={[localStyles.displayName, { color: colors.text }]}>
-          {profile?.name || profile?.username || 'Unknown'}
-        </Text>
+        <MfmRenderer
+          nodes={mfm.parse(profileName)}
+          emojis={profileEmojiMap}
+          colors={colors}
+          textStyle={[localStyles.displayName, { color: colors.text }]}
+          emojiSize={22}
+        />
         <Text style={[localStyles.username, { color: colors.textMuted }]}>
           @{profile?.username}{profile?.host ? `@${profile.host}` : ''}
         </Text>
         {profile?.description && (
-          <Text style={[localStyles.bio, { color: colors.text }]}>
-            {profile.description}
-          </Text>
+          <MfmRenderer
+            nodes={mfm.parse(profile.description)}
+            emojis={profileEmojiMap}
+            colors={colors}
+            textStyle={[localStyles.bio, { color: colors.text }]}
+          />
         )}
         <View style={localStyles.statsRow}>
           <Pressable style={localStyles.statItem} onPress={() => setActiveTab('following')}>
@@ -212,6 +225,7 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
       onReactionPress={(index) => handleReactionToggle(item, index)}
       onUserPress={handleUserPress}
       onImagePress={openImageViewer}
+      onReferencedNotePress={(noteId) => router.push(`/note/${noteId}`)}
     />
   );
 
@@ -237,12 +251,13 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
   }
 
   return (
-    <FlatList contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 20 }}
+    <FlatList contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 96 }}
       data={activeTab === 'notes' ? notes : activeTab === 'following' ? following : followers}
       keyExtractor={(item) => item.id}
       renderItem={activeTab === 'notes' ? renderNote : renderUser}
       ListHeaderComponent={renderHeader}
       style={{ flex: 1, backgroundColor: colors.bg }}
+      scrollIndicatorInsets={{ bottom: insets.bottom + 96 }}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={() => loadProfile(true)} tintColor={colors.primary} />
       }

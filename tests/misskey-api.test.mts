@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as mk from 'misskey-js';
-import { normalizeMisskeyEndpoint, resolveImagePreviewUrl } from '../src/utils/misskeyApi.ts';
+import {
+  buildMisskeyEmojiMap,
+  normalizeMisskeyEmojiName,
+  normalizeMisskeyEndpoint,
+  resolveImagePreviewUrl,
+  resolveMisskeyEmojiUrl,
+} from '../src/utils/misskeyApi.ts';
 
 test('normalizeMisskeyEndpoint strips /api prefix', () => {
   assert.equal(normalizeMisskeyEndpoint('/api/notes/timeline'), 'notes/timeline');
@@ -23,6 +29,21 @@ test('resolveImagePreviewUrl prefers thumbnail URL when available', () => {
     resolveImagePreviewUrl('https://example.com/thumb.jpg', ''),
     'https://example.com/thumb.jpg',
   );
+});
+
+test('normalizeMisskeyEmojiName strips host suffix and colons', () => {
+  assert.equal(normalizeMisskeyEmojiName(':_shi_@misskey.io:'), '_shi_');
+  assert.equal(normalizeMisskeyEmojiName('party_parrot@remote.example'), 'party_parrot');
+});
+
+test('resolveMisskeyEmojiUrl matches host-qualified emoji names', () => {
+  const emojiMap = buildMisskeyEmojiMap(
+    [{ name: '_shi_', url: 'https://example.com/shi.png' }],
+    { ':party_parrot@remote.example:': 'https://example.com/parrot.png' },
+  );
+
+  assert.equal(resolveMisskeyEmojiUrl(emojiMap, ':_shi_@misskey.io:'), 'https://example.com/shi.png');
+  assert.equal(resolveMisskeyEmojiUrl(emojiMap, 'party_parrot'), 'https://example.com/parrot.png');
 });
 
 test('misskey-js APIClient uses POST for regular endpoints', async () => {

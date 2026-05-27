@@ -122,6 +122,7 @@ export default function ExploreScreen() {
           onReactionPress={(note, index) => handleReactionToggle(note, index)}
           onUserPress={handleUserPress}
           onImagePress={openImageViewer}
+          onReferencedNotePress={(noteId) => router.push(`/note/${noteId}`)}
         />
       ) : searched ? (
         <View style={localStyles.center}>

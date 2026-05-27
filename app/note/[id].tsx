@@ -150,6 +150,7 @@ export default function NoteDetailScreen() {
               onReactionPress={(index) => handleReactionToggle(note, index)}
               onUserPress={(userId) => router.push(`/user/${userId}`)}
               onImagePress={openImageViewer}
+              onReferencedNotePress={(noteId) => router.push(`/note/${noteId}`)}
             />
           </View>
 
@@ -168,11 +169,12 @@ export default function NoteDetailScreen() {
                       onReplyPress={() => {}}
                       onReplyTextChange={() => {}}
                       onReplySubmit={() => {}}
-                      onRenotePress={() => openRenoteOptions(note)}
-                      onSharePress={() => handleShare(note)}
-                      onReactionPress={(index) => handleReactionToggle(note, index)}
+                      onRenotePress={() => openRenoteOptions(r)}
+                      onSharePress={() => handleShare(r)}
+                      onReactionPress={(index) => handleReactionToggle(r, index)}
                       onUserPress={(userId) => router.push(`/user/${userId}`)}
                       onImagePress={openImageViewer}
+                      onReferencedNotePress={(noteId) => router.push(`/note/${noteId}`)}
                     />
                   </View>
                 ))

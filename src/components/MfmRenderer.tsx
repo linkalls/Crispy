@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import * as Linking from 'expo-linking';
 import * as mfm from 'mfm-js';
-import { Animated, Image, Text } from 'react-native';
+import { Animated, Image, StyleProp, Text, TextStyle } from 'react-native';
 import { noteContentStyle } from '../styles/styles';
+import { resolveMisskeyEmojiUrl } from '../utils/misskeyApi';
 import { ColorScheme } from '../utils/types';
 
 function MfmFunctionNode({ node, children }: { node: any; children: React.ReactNode }) {
@@ -66,10 +67,14 @@ export function MfmRenderer({
   nodes,
   emojis = {},
   colors,
+  textStyle,
+  emojiSize = 20,
 }: {
   nodes: mfm.MfmNode[];
   emojis?: Record<string, string>;
   colors: ColorScheme;
+  textStyle?: StyleProp<TextStyle>;
+  emojiSize?: number;
 }) {
   const renderNodes = (targetNodes: mfm.MfmNode[], keyPrefix: string) =>
     targetNodes.map((node, i) => {
@@ -85,13 +90,13 @@ export function MfmRenderer({
         return <Text key={key}>{node.props.emoji}</Text>;
       }
       if (node.type === 'emojiCode') {
-        const emojiUrl = emojis[node.props.name] || emojis[`:${node.props.name}:`];
+        const emojiUrl = resolveMisskeyEmojiUrl(emojis, node.props.name);
         if (emojiUrl) {
           return (
             <Image
               key={key}
               source={{ uri: emojiUrl }}
-              style={{ width: 20, height: 20, marginHorizontal: 1 }}
+              style={{ width: emojiSize, height: emojiSize, marginHorizontal: 1 }}
               resizeMode="contain"
             />
           );
@@ -177,5 +182,5 @@ export function MfmRenderer({
       return null;
     });
 
-  return <Text style={[noteContentStyle, { color: colors.text }]}>{renderNodes(nodes, 'node')}</Text>;
+  return <Text style={[noteContentStyle, { color: colors.text }, textStyle]}>{renderNodes(nodes, 'node')}</Text>;
 }

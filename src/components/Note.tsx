@@ -22,6 +22,7 @@ export function Note({
   onReactionPress,
   onUserPress,
   onImagePress,
+  onReferencedNotePress,
 }: {
   note: TimelineNote;
   isReplying: boolean;
@@ -37,6 +38,7 @@ export function Note({
   onReactionPress: (index: number) => void;
   onUserPress?: (userId: string) => void;
   onImagePress?: (media: { url: string; thumbnailUrl?: string; type?: string }[], index: number) => void;
+  onReferencedNotePress?: (noteId: string) => void;
 }) {
   return (
     <Pressable
@@ -45,7 +47,13 @@ export function Note({
     >
       {/* 返信プレビュー表示 */}
       {note.reply ? (
-        <View style={[styles.replyPreview, { backgroundColor: colors.bg, borderColor: colors.border }]}>
+        <Pressable
+          style={[styles.replyPreview, { backgroundColor: colors.bg, borderColor: colors.border }]}
+          onPress={(e) => {
+            e.stopPropagation();
+            onReferencedNotePress?.(note.reply!.id);
+          }}
+        >
           <Text style={[styles.replyPreviewLabel, { color: colors.textMuted }]}>返信:</Text>
           <View style={styles.replyPreviewContent}>
             <Image source={{ uri: note.reply.user.avatar }} style={styles.replyPreviewAvatar} />
@@ -58,7 +66,7 @@ export function Note({
               </Text>
             </View>
           </View>
-        </View>
+        </Pressable>
       ) : null}
 
       {/* リノート表示 */}
@@ -143,7 +151,13 @@ export function Note({
 
           {/* 引用ノート表示 */}
           {note.quote ? (
-            <View style={[styles.quoteCard, { borderColor: colors.border, backgroundColor: colors.bg }]}>
+            <Pressable
+              style={[styles.quoteCard, { borderColor: colors.border, backgroundColor: colors.bg }]}
+              onPress={(e) => {
+                e.stopPropagation();
+                onReferencedNotePress?.(note.quote!.id);
+              }}
+            >
               <View style={styles.quoteHeaderRow}>
                 <Image source={{ uri: note.quote.user.avatar }} style={styles.quoteAvatar} />
                 <Text style={[styles.quoteName, { color: colors.text }]} numberOfLines={1}>
@@ -192,7 +206,7 @@ export function Note({
                   })}
                 </View>
               )}
-            </View>
+            </Pressable>
           ) : null}
 
           {/* リアクション表示 */}
