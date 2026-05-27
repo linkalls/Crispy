@@ -1,21 +1,20 @@
-import { useEffect } from 'react';
 import { Stack } from 'expo-router';
+import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { GlobalStateProvider, useGlobalState } from '../src/context/GlobalState';
-import { useInteractionState } from '../src/context/InteractionState';
-import { useMisskey } from '../src/hooks';
 import {
   MediaViewerModal,
   NoteComposerModal,
   QuoteComposerModal,
-  RenoteOptionsModal,
   ReactionPickerModal,
+  RenoteOptionsModal,
   Toast
 } from '../src/components';
-import { TimelineNote } from '../src/utils/types';
-import { normalizeMisskeyReactionInput } from '../src/utils/misskeyApi';
-import { globalEvents } from '../src/context/InteractionState';
+import { GlobalStateProvider, useGlobalState } from '../src/context/GlobalState';
+import { globalEvents, useInteractionState } from '../src/context/InteractionState';
+import { useMisskey } from '../src/hooks';
 import { logError } from '../src/utils/logger';
+import { normalizeMisskeyReactionInput } from '../src/utils/misskeyApi';
+import { TimelineNote } from '../src/utils/types';
 
 // Catch global uncaught errors if possible
 if (typeof ErrorUtils !== 'undefined') {

@@ -1,5 +1,9 @@
+import {
+  buildMisskeyEmojiMap,
+  isSameMisskeyReaction,
+  resolveMisskeyEmojiUrl,
+} from "./misskeyApi.ts";
 import type { MisskeyNote, TimelineNote } from "./types.ts";
-import { buildMisskeyEmojiMap, isSameMisskeyReaction, resolveMisskeyEmojiUrl } from "./misskeyApi.ts";
 
 const DEFAULT_AVATAR =
   "https://api.dicebear.com/9.x/avataaars/svg?seed=Crispy&backgroundColor=b6e3f4";
@@ -36,12 +40,17 @@ export function mapNote(note: MisskeyNote, fallbackHost: string): TimelineNote {
   const replyNote = target.reply ? mapNote(target.reply, fallbackHost) : null;
 
   // 引用元のノートをマップ（本文があるリノートの場合のみ）
-  const quoteNote = (!isPureRenote && note.renote) ? mapNote(note.renote, fallbackHost) : null;
+  const quoteNote =
+    !isPureRenote && note.renote ? mapNote(note.renote, fallbackHost) : null;
 
   // カスタム絵文字のマップを作成 — handle both array and object formats
   const toEmojiArray = (e: any): Array<{ name: string; url: string }> => {
     if (Array.isArray(e)) return e;
-    if (e && typeof e === 'object') return Object.entries(e).map(([name, url]) => ({ name, url: url as string }));
+    if (e && typeof e === "object")
+      return Object.entries(e).map(([name, url]) => ({
+        name,
+        url: url as string,
+      }));
     return [];
   };
   const noteEmojis = toEmojiArray(note.emojis);
@@ -53,17 +62,19 @@ export function mapNote(note: MisskeyNote, fallbackHost: string): TimelineNote {
     target.reactionEmojis,
   );
 
-  const reactions = Object.entries(target.reactions || {}).map(([emoji, count]) => {
-    const reactionEmojiUrl = resolveMisskeyEmojiUrl(emojiMap, emoji);
+  const reactions = Object.entries(target.reactions || {}).map(
+    ([emoji, count]) => {
+      const reactionEmojiUrl = resolveMisskeyEmojiUrl(emojiMap, emoji);
 
-    return {
-      emoji,
-      count,
-      reacted: isSameMisskeyReaction(target.myReaction, emoji),
-      isCustom: emoji.startsWith(':'),
-      url: reactionEmojiUrl
-    };
-  });
+      return {
+        emoji,
+        count,
+        reacted: isSameMisskeyReaction(target.myReaction, emoji),
+        isCustom: emoji.startsWith(":"),
+        url: reactionEmojiUrl,
+      };
+    },
+  );
 
   return {
     id: note.id,
@@ -71,7 +82,7 @@ export function mapNote(note: MisskeyNote, fallbackHost: string): TimelineNote {
     content: content || (note.renote ? "" : "(no text)"),
     createdAtLabel: toRelativeTime(target.createdAt),
     user: {
-      id: target.user.id || '',
+      id: target.user.id || "",
       name: target.user.name || target.user.username,
       username: target.user.username,
       host: target.user.host || fallbackHost,
@@ -95,9 +106,13 @@ export function mapNote(note: MisskeyNote, fallbackHost: string): TimelineNote {
 export const DEFAULT_HOST = "misskey.io";
 export const STORAGE_KEY = "crispy:state:v2";
 
-export function toggleNoteReactionLocally(note: TimelineNote, emoji: string, isReacting: boolean): TimelineNote {
+export function toggleNoteReactionLocally(
+  note: TimelineNote,
+  emoji: string,
+  isReacting: boolean,
+): TimelineNote {
   const newReactions = [...note.reactions];
-  const targetIndex = newReactions.findIndex(r => r.emoji === emoji);
+  const targetIndex = newReactions.findIndex((r) => r.emoji === emoji);
 
   if (targetIndex !== -1) {
     const r = newReactions[targetIndex];
@@ -107,7 +122,11 @@ export function toggleNoteReactionLocally(note: TimelineNote, emoji: string, isR
       }
     } else {
       if (r.reacted) {
-        newReactions[targetIndex] = { ...r, count: Math.max(0, r.count - 1), reacted: false };
+        newReactions[targetIndex] = {
+          ...r,
+          count: Math.max(0, r.count - 1),
+          reacted: false,
+        };
       }
     }
     // Remove if count goes to 0 (optional, but Misskey sometimes keeps it or drops it. We can drop if 0)
@@ -120,7 +139,7 @@ export function toggleNoteReactionLocally(note: TimelineNote, emoji: string, isR
       emoji,
       count: 1,
       reacted: true,
-      isCustom: emoji.startsWith(':'),
+      isCustom: emoji.startsWith(":"),
       // url might be missing if it's a custom emoji and we don't have the global map here,
       // but MfmRenderer/Note can fallback or we just rely on existing cache.
     });

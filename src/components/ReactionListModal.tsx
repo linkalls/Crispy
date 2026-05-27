@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
-import { Modal, View, Text, Pressable, StyleSheet, FlatList, Image, ActivityIndicator, Platform, BackHandler } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, BackHandler, FlatList, Image, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ColorScheme, TimelineNote } from "../utils/types";
 

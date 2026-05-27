@@ -1,13 +1,12 @@
-import React, { useState } from 'react';
-import { View, Text, Switch, Pressable, ScrollView, Image, TextInput, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import React, { useState } from 'react';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useGlobalState } from '../src/context/GlobalState';
-import { styles } from '../src/styles/styles';
 import { createSessionId, DEFAULT_HOST, normalizeHost } from '../src/utils/formatting';
-import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
 import { checkMiAuthSession } from '../src/utils/misskeyAuth';
 
 export default function SettingsScreen() {
@@ -178,48 +177,48 @@ export default function SettingsScreen() {
         </View>
 
         {!isAddingAccount ? (
-           <View style={{ paddingHorizontal: 16, marginTop: 8, marginBottom: 40 }}>
-             <Pressable
-               style={({ pressed }) => [localStyles.addButton, { backgroundColor: colors.primary }, pressed && { opacity: 0.8 }]}
-               onPress={() => setIsAddingAccount(true)}
-             >
-               <Ionicons name="add" size={20} color="#fff" />
-               <Text style={localStyles.addButtonText}>別のアカウントを追加</Text>
-             </Pressable>
-           </View>
+          <View style={{ paddingHorizontal: 16, marginTop: 8, marginBottom: 40 }}>
+            <Pressable
+              style={({ pressed }) => [localStyles.addButton, { backgroundColor: colors.primary }, pressed && { opacity: 0.8 }]}
+              onPress={() => setIsAddingAccount(true)}
+            >
+              <Ionicons name="add" size={20} color="#fff" />
+              <Text style={localStyles.addButtonText}>別のアカウントを追加</Text>
+            </Pressable>
+          </View>
         ) : (
           <View style={[localStyles.section, { marginBottom: 40 }]}>
-             <View style={[localStyles.card, { backgroundColor: colors.cardBg, borderColor: colors.border, padding: 16 }]}>
-                <Text style={{ color: colors.text, fontSize: 16, fontWeight: 'bold', marginBottom: 12 }}>アカウントの追加</Text>
-                <TextInput
-                  value={serverHostInput}
-                  onChangeText={setServerHostInput}
-                  style={[localStyles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.bg }]}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  placeholder="misskey.io"
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="url"
-                  returnKeyType="go"
-                  onSubmitEditing={handleLogin}
-                />
-                {oauthError ? <Text style={{ color: '#ef4444', marginTop: 8, fontSize: 13 }}>{oauthError}</Text> : null}
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
-                  <Pressable
-                    style={({ pressed }) => [localStyles.addActionButton, { backgroundColor: colors.border }, pressed && { opacity: 0.8 }]}
-                    onPress={() => setIsAddingAccount(false)}
-                  >
-                    <Text style={{ color: colors.text }}>キャンセル</Text>
-                  </Pressable>
-                  <Pressable
-                    style={({ pressed }) => [localStyles.addActionButton, { backgroundColor: colors.primary }, pressed && { opacity: 0.8 }]}
-                    onPress={handleLogin}
-                    disabled={oauthLoading}
-                  >
-                    {oauthLoading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontWeight: 'bold' }}>ログイン</Text>}
-                  </Pressable>
-                </View>
-             </View>
+            <View style={[localStyles.card, { backgroundColor: colors.cardBg, borderColor: colors.border, padding: 16 }]}>
+              <Text style={{ color: colors.text, fontSize: 16, fontWeight: 'bold', marginBottom: 12 }}>アカウントの追加</Text>
+              <TextInput
+                value={serverHostInput}
+                onChangeText={setServerHostInput}
+                style={[localStyles.input, { borderColor: colors.border, color: colors.text, backgroundColor: colors.bg }]}
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholder="misskey.io"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="url"
+                returnKeyType="go"
+                onSubmitEditing={handleLogin}
+              />
+              {oauthError ? <Text style={{ color: '#ef4444', marginTop: 8, fontSize: 13 }}>{oauthError}</Text> : null}
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 16 }}>
+                <Pressable
+                  style={({ pressed }) => [localStyles.addActionButton, { backgroundColor: colors.border }, pressed && { opacity: 0.8 }]}
+                  onPress={() => setIsAddingAccount(false)}
+                >
+                  <Text style={{ color: colors.text }}>キャンセル</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [localStyles.addActionButton, { backgroundColor: colors.primary }, pressed && { opacity: 0.8 }]}
+                  onPress={handleLogin}
+                  disabled={oauthLoading}
+                >
+                  {oauthLoading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={{ color: '#fff', fontWeight: 'bold' }}>ログイン</Text>}
+                </Pressable>
+              </View>
+            </View>
           </View>
         )}
       </ScrollView>

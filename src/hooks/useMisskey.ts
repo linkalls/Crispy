@@ -1,16 +1,19 @@
+import * as mk from "misskey-js";
 import { useCallback, useMemo } from "react";
-import type { StoredAccount } from "../utils/types";
-import * as mk from 'misskey-js';
-import { normalizeMisskeyEndpoint } from "../utils/misskeyApi";
-import { logError, logInfo } from "../utils/logger";
 import { useGlobalState } from "../context/GlobalState";
-import { buildMisskeyMultipartEntries, getMockMisskeyResponse } from "../utils/misskeyMock";
+import { logError } from "../utils/logger";
+import { normalizeMisskeyEndpoint } from "../utils/misskeyApi";
+import {
+  buildMisskeyMultipartEntries,
+  getMockMisskeyResponse,
+} from "../utils/misskeyMock";
+import type { StoredAccount } from "../utils/types";
 
 export function useMisskey(activeAccount: StoredAccount | null) {
   const { devMode } = useGlobalState();
   const client = useMemo(() => {
     if (!activeAccount) return null;
-    const hostUrl = activeAccount.host.replace(/\/+$/, '');
+    const hostUrl = activeAccount.host.replace(/\/+$/, "");
     return new mk.api.APIClient({
       origin: `https://${hostUrl}`,
       credential: activeAccount.token || undefined,
@@ -29,8 +32,11 @@ export function useMisskey(activeAccount: StoredAccount | null) {
 
       const endpoint = normalizeMisskeyEndpoint(path);
 
-      if (activeAccount.token === 'mock_token') {
-        const mockResult = getMockMisskeyResponse(endpoint, { host: activeAccount.host, payload });
+      if (activeAccount.token === "mock_token") {
+        const mockResult = getMockMisskeyResponse(endpoint, {
+          host: activeAccount.host,
+          payload,
+        });
         return (mockResult ?? {}) as T;
       }
 
@@ -43,19 +49,22 @@ export function useMisskey(activeAccount: StoredAccount | null) {
           throw new Error("Misskey APIクライアントを初期化できませんでした。");
         }
 
-        const isMultipart = endpoint.startsWith('drive/files/');
+        const isMultipart = endpoint.startsWith("drive/files/");
         let result;
 
         if (isMultipart && payload.file) {
           const formData = new FormData();
-          for (const [key, value] of buildMisskeyMultipartEntries(payload, activeAccount.token)) {
+          for (const [key, value] of buildMisskeyMultipartEntries(
+            payload,
+            activeAccount.token,
+          )) {
             formData.append(key, value as any);
           }
 
-          const hostUrl = activeAccount.host.replace(/\/+$/, '');
+          const hostUrl = activeAccount.host.replace(/\/+$/, "");
           // React Native needs no Content-Type header so it can set the multipart boundary automatically
           const res = await fetch(`https://${hostUrl}/api/${endpoint}`, {
-            method: 'POST',
+            method: "POST",
             headers: {
               // 'Content-Type': 'multipart/form-data', // DO NOT SET THIS, React Native needs to set boundary
             },
@@ -63,9 +72,9 @@ export function useMisskey(activeAccount: StoredAccount | null) {
           });
 
           if (!res.ok) {
-            const errBody = await res.text().catch(() => '');
+            const errBody = await res.text().catch(() => "");
             const errorMsg = `API Error on multipart: ${res.status} ${errBody}`;
-            await logError('misskeyRequest multipart error', errorMsg, devMode);
+            await logError("misskeyRequest multipart error", errorMsg, devMode);
             throw new Error(`API Error: ${res.status} ${errBody}`);
           }
           result = await res.json();
@@ -76,7 +85,7 @@ export function useMisskey(activeAccount: StoredAccount | null) {
         return result as T;
       } catch (e: any) {
         await logError(`misskeyRequest error for ${path}`, e, devMode);
-        if (e && typeof e === 'object' && mk.api.isAPIError(e)) {
+        if (e && typeof e === "object" && mk.api.isAPIError(e)) {
           throw new Error(e.message || `${e.code} (${e.id})`);
         }
         throw e;

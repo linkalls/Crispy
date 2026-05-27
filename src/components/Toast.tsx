@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from "react";
-import { Animated, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import React, { useEffect, useRef } from "react";
+import { Animated, StyleSheet, Text } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { ColorScheme } from "../utils/types";
 

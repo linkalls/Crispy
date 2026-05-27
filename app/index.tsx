@@ -1,13 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { Redirect } from 'expo-router';
-import { View, ActivityIndicator } from 'react-native';
-import { useGlobalState } from '../src/context/GlobalState';
-import { AuthScreen } from '../src/components';
-import { createSessionId, DEFAULT_HOST as DEFAULT_HOST_CONST, normalizeHost } from '../src/utils/formatting';
-import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
-import { MisskeyMiAuthCheck, MisskeyUser } from '../src/utils/types';
+import { Redirect } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
+import { AuthScreen } from '../src/components';
+import { useGlobalState } from '../src/context/GlobalState';
+import { createSessionId, DEFAULT_HOST as DEFAULT_HOST_CONST, normalizeHost } from '../src/utils/formatting';
 import { checkMiAuthSession } from '../src/utils/misskeyAuth';
+import { MisskeyMiAuthCheck } from '../src/utils/types';
 
 
 

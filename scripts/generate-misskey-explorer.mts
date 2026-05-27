@@ -1,10 +1,10 @@
-import { readFileSync, writeFileSync } from 'node:fs';
-import { buildMisskeyExplorerPresetsFromDefinitionText } from '../src/utils/misskeyExplorerGenerator.ts';
+import { readFileSync, writeFileSync } from "node:fs";
+import { buildMisskeyExplorerPresetsFromDefinitionText } from "../src/utils/misskeyExplorerGenerator.ts";
 
-const definitionPath = 'node_modules/misskey-js/built/autogen/endpoint.d.ts';
-const outputPath = 'src/utils/misskeyExplorer.generated.ts';
+const definitionPath = "node_modules/misskey-js/built/autogen/endpoint.d.ts";
+const outputPath = "src/utils/misskeyExplorer.generated.ts";
 
-const definitionText = readFileSync(definitionPath, 'utf8');
+const definitionText = readFileSync(definitionPath, "utf8");
 const presets = buildMisskeyExplorerPresetsFromDefinitionText(definitionText);
 
 const output = `import type { MisskeyExplorerPreset } from './misskeyExplorer.ts';

@@ -1,9 +1,9 @@
-import React, { useEffect } from 'react';
-import { Modal, View, Image, StyleSheet, Platform, BackHandler, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { VideoView, useVideoPlayer } from 'expo-video';
+import React, { useEffect } from 'react';
+import { BackHandler, Dimensions, Image, Modal, Platform, StyleSheet, View } from 'react-native';
 import ImageViewer from 'react-native-image-zoom-viewer';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export interface MediaItem {
   url: string;
