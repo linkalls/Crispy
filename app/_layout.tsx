@@ -13,6 +13,17 @@ import {
 } from '../src/components';
 import { TimelineNote } from '../src/utils/types';
 import { normalizeMisskeyReactionInput } from '../src/utils/misskeyApi';
+import { globalEvents } from '../src/context/InteractionState';
+import { logError } from '../src/utils/logger';
+
+// Catch global uncaught errors if possible
+if (typeof ErrorUtils !== 'undefined') {
+  ErrorUtils.setGlobalHandler((error: any, isFatal?: boolean) => {
+    logError(`Global Error (Fatal: ${isFatal})`, error, true).finally(() => {
+      // Pass to original handler if it exists
+    });
+  });
+}
 
 function RootModals() {
   const {
@@ -46,9 +57,10 @@ function RootModals() {
 
   const performPureRenote = async (note: TimelineNote) => {
     try {
+      // Optimistic update
+      globalEvents.emit('noteUpdated', { noteId: note.id, action: 'renote' });
       await misskeyRequest('/api/notes/create', { renoteId: note.targetId }, true);
       showToast('成功', 'リポストしました。');
-      triggerRefresh();
     } catch (error) {
       showToast('失敗', error instanceof Error ? error.message : 'リポストに失敗しました。', true);
     }
@@ -84,9 +96,10 @@ function RootModals() {
   const handleQuoteSubmit = async (text: string) => {
     if (!quotingNote) return;
     try {
+      // Optimistic update for the quoted note
+      globalEvents.emit('noteUpdated', { noteId: quotingNote.id, action: 'renote' });
       await misskeyRequest('/api/notes/create', { text, renoteId: quotingNote.targetId }, true);
       showToast('成功', '引用リポストを投稿しました。');
-      triggerRefresh();
     } catch (error) {
       showToast('失敗', error instanceof Error ? error.message : '引用リポストに失敗しました。', true);
       throw error;
@@ -98,9 +111,10 @@ function RootModals() {
     try {
       const normalized = normalizeMisskeyReactionInput(reaction);
       if (!normalized) return;
+      // Local optimistic update via event bus
+      globalEvents.emit('noteUpdated', { noteId: note.id, action: 'reaction', emoji: normalized, isReacting: true });
       await misskeyRequest('/api/notes/reactions/create', { noteId: note.targetId, reaction: normalized }, true);
       showToast('成功', 'リアクションしました。');
-      triggerRefresh();
     } catch (error) {
       showToast('失敗', error instanceof Error ? error.message : 'リアクションに失敗しました。', true);
     }

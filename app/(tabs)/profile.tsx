@@ -10,9 +10,10 @@ import { useInteractionState } from '../../src/context/InteractionState';
 import { useMisskey } from '../../src/hooks';
 import { Note } from '../../src/components/Note';
 import { TimelineNote } from '../../src/utils/types';
-import { mapNote } from '../../src/utils/formatting';
+import { mapNote, toggleNoteReactionLocally, incrementNoteRenoteLocally } from '../../src/utils/formatting';
 import { MfmRenderer } from '../../src/components/MfmRenderer';
 import { buildMisskeyEmojiMap, buildMisskeyUserLookup, normalizeMisskeyReactionInput } from '../../src/utils/misskeyApi';
+import { globalEvents } from '../../src/context/InteractionState';
 
 type UserProfile = {
   id: string;
@@ -112,6 +113,16 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
     loadProfile();
   }, [loadProfile]);
 
+  useEffect(() => {
+    return globalEvents.on('noteUpdated', (payload) => {
+      if (payload.action === 'reaction') {
+        setNotes(prev => prev.map(n => n.id === payload.noteId ? toggleNoteReactionLocally(n, payload.emoji, payload.isReacting) : n));
+      } else if (payload.action === 'renote') {
+        setNotes(prev => prev.map(n => n.id === payload.noteId ? incrementNoteRenoteLocally(n) : n));
+      }
+    });
+  }, []);
+
   const handleNotePress = (note: TimelineNote) => {
     router.push(`/note/${note.id}`);
   };
@@ -139,15 +150,16 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
     if (!target) return;
     try {
       if (target.reacted) {
+        setNotes(prev => prev.map(n => n.id === note.id ? toggleNoteReactionLocally(n, target.emoji, false) : n));
         await misskeyRequest('/api/notes/reactions/delete', { noteId: note.targetId }, true);
         showToast('成功', 'リアクションを解除しました。');
       } else {
         const normalizedReaction = normalizeMisskeyReactionInput(target.emoji);
         if (!normalizedReaction) return;
+        setNotes(prev => prev.map(n => n.id === note.id ? toggleNoteReactionLocally(n, target.emoji, true) : n));
         await misskeyRequest('/api/notes/reactions/create', { noteId: note.targetId, reaction: normalizedReaction }, true);
         showToast('成功', 'リアクションしました。');
       }
-      loadProfile(true);
     } catch (error) {
       showToast('失敗', error instanceof Error ? error.message : 'リアクションに失敗しました。', true);
     }
