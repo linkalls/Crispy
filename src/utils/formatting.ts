@@ -1,5 +1,5 @@
 import { MisskeyNote, TimelineNote } from "./types";
-import { buildMisskeyEmojiMap, resolveMisskeyEmojiUrl } from "./misskeyApi";
+import { buildMisskeyEmojiMap, isSameMisskeyReaction, resolveMisskeyEmojiUrl } from "./misskeyApi";
 
 const DEFAULT_AVATAR =
   "https://api.dicebear.com/9.x/avataaars/svg?seed=Crispy&backgroundColor=b6e3f4";
@@ -54,7 +54,7 @@ export function mapNote(note: MisskeyNote, fallbackHost: string): TimelineNote {
     return {
       emoji,
       count,
-      reacted: target.myReaction === emoji,
+      reacted: isSameMisskeyReaction(target.myReaction, emoji),
       isCustom: emoji.startsWith(':'),
       url: reactionEmojiUrl
     };

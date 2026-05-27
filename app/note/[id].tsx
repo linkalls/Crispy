@@ -9,6 +9,7 @@ import { useInteractionState } from "../../src/context/InteractionState";
 import { useMisskey } from "../../src/hooks";
 import { TimelineNote, MisskeyNote } from "../../src/utils/types";
 import { mapNote } from "../../src/utils/formatting";
+import { normalizeMisskeyReactionInput } from "../../src/utils/misskeyApi";
 import { Note, ReplyComposer } from "../../src/components";
 
 export default function NoteDetailScreen() {
@@ -88,7 +89,9 @@ export default function NoteDetailScreen() {
         await misskeyRequest('/api/notes/reactions/delete', { noteId: note.targetId }, true);
         showToast('成功', 'リアクションを解除しました。');
       } else {
-        await misskeyRequest('/api/notes/reactions/create', { noteId: note.targetId, reaction: target.emoji }, true);
+        const normalizedReaction = normalizeMisskeyReactionInput(target.emoji);
+        if (!normalizedReaction) return;
+        await misskeyRequest('/api/notes/reactions/create', { noteId: note.targetId, reaction: normalizedReaction }, true);
         showToast('成功', 'リアクションしました。');
       }
       fetchNoteAndReplies();

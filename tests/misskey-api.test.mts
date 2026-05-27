@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import * as mk from 'misskey-js';
 import {
   buildMisskeyEmojiMap,
+  isSameMisskeyReaction,
   normalizeMisskeyEmojiName,
   normalizeMisskeyEndpoint,
+  normalizeMisskeyReactionInput,
   resolveImagePreviewUrl,
   resolveMisskeyEmojiUrl,
 } from '../src/utils/misskeyApi.ts';
@@ -44,6 +46,17 @@ test('resolveMisskeyEmojiUrl matches host-qualified emoji names', () => {
 
   assert.equal(resolveMisskeyEmojiUrl(emojiMap, ':_shi_@misskey.io:'), 'https://example.com/shi.png');
   assert.equal(resolveMisskeyEmojiUrl(emojiMap, 'party_parrot'), 'https://example.com/parrot.png');
+});
+
+test('normalizeMisskeyReactionInput normalizes custom reaction formats', () => {
+  assert.equal(normalizeMisskeyReactionInput(':party_parrot@remote.example:'), ':party_parrot:');
+  assert.equal(normalizeMisskeyReactionInput('party_parrot'), ':party_parrot:');
+  assert.equal(normalizeMisskeyReactionInput('👍'), '👍');
+});
+
+test('isSameMisskeyReaction matches equivalent custom reactions', () => {
+  assert.equal(isSameMisskeyReaction(':party_parrot@remote.example:', ':party_parrot:'), true);
+  assert.equal(isSameMisskeyReaction(':party_parrot:', ':other:'), false);
 });
 
 test('misskey-js APIClient uses POST for regular endpoints', async () => {
