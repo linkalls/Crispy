@@ -45,30 +45,6 @@ export function Note({
       style={[styles.noteCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
       onPress={onPress}
     >
-      {/* 返信プレビュー表示 */}
-      {note.reply ? (
-        <Pressable
-          style={[styles.replyPreview, { backgroundColor: colors.bg, borderColor: colors.border }]}
-          onPress={(e) => {
-            e.stopPropagation();
-            onReferencedNotePress?.(note.reply!.id);
-          }}
-        >
-          <Text style={[styles.replyPreviewLabel, { color: colors.textMuted }]}>返信:</Text>
-          <View style={styles.replyPreviewContent}>
-            <Image source={{ uri: note.reply.user.avatar }} style={styles.replyPreviewAvatar} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.replyPreviewName, { color: colors.text }]} numberOfLines={1}>
-                {note.reply.user.name}
-              </Text>
-              <Text style={[styles.replyPreviewText, { color: colors.textMuted }]} numberOfLines={2}>
-                {note.reply.content}
-              </Text>
-            </View>
-          </View>
-        </Pressable>
-      ) : null}
-
       {/* リノート表示 */}
       {note.renoteUser ? (
         <Text style={[styles.renoteText, { color: colors.textMuted }]}>

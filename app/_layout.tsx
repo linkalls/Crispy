@@ -11,6 +11,7 @@ import {
   Toast
 } from '../src/components';
 import { TimelineNote } from '../src/utils/types';
+import { normalizeMisskeyReactionInput } from '../src/utils/misskeyApi';
 
 function RootModals() {
   const { isImageViewerVisible, previewMedia, previewImageIndex, closeImageViewer, activeAccount, colors } = useGlobalState();
@@ -58,7 +59,9 @@ function RootModals() {
   const performReaction = async (note: TimelineNote, reaction: string) => {
     if (!activeAccount) return;
     try {
-      await misskeyRequest('/api/notes/reactions/create', { noteId: note.targetId, reaction }, true);
+      const normalized = normalizeMisskeyReactionInput(reaction);
+      if (!normalized) return;
+      await misskeyRequest('/api/notes/reactions/create', { noteId: note.targetId, reaction: normalized }, true);
       showToast('成功', 'リアクションしました。');
       triggerRefresh();
     } catch (error) {

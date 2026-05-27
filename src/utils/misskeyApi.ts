@@ -19,6 +19,18 @@ export function normalizeMisskeyEmojiName(name: string): string {
   return trimmed.split("@")[0] || trimmed;
 }
 
+function isLikelyCustomReaction(value: string): boolean {
+  return value.includes(":") || value.includes("@") || /^[a-zA-Z0-9_+-]+$/.test(value);
+}
+
+export function normalizeMisskeyReactionInput(reaction: string): string {
+  const trimmed = reaction.trim();
+  if (!trimmed) return "";
+  if (!isLikelyCustomReaction(trimmed)) return trimmed;
+  const normalized = normalizeMisskeyEmojiName(trimmed);
+  return normalized ? `:${normalized}:` : "";
+}
+
 function getMisskeyEmojiCandidates(name: string): string[] {
   const trimmed = name.trim();
   const normalized = normalizeMisskeyEmojiName(trimmed);
@@ -70,4 +82,9 @@ export function resolveMisskeyEmojiUrl(
 ): string | undefined {
   const match = getMisskeyEmojiCandidates(name).find((candidate) => emojiMap[candidate]);
   return match ? emojiMap[match] : undefined;
+}
+
+export function isSameMisskeyReaction(left: string | null | undefined, right: string | null | undefined): boolean {
+  if (!left || !right) return false;
+  return normalizeMisskeyReactionInput(left) === normalizeMisskeyReactionInput(right);
 }

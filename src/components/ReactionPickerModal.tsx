@@ -8,10 +8,15 @@ import {
   StyleSheet,
   Platform,
   BackHandler,
+  TextInput,
 } from "react-native";
 import { ColorScheme, TimelineNote } from "../utils/types";
+import { normalizeMisskeyReactionInput } from "../utils/misskeyApi";
 
-const DEFAULT_REACTIONS = ["👍", "❤️", "😂", "🎉", "😮", "😢", "🙏", "👀"];
+const DEFAULT_REACTIONS = [
+  "👍", "❤️", "🔥", "😂", "🎉", "😮", "😢", "🙏",
+  "👏", "💯", "🥰", "✨", "🎊", "😆", "🤔", "👀",
+];
 
 export function ReactionPickerModal({
   visible,
@@ -27,6 +32,18 @@ export function ReactionPickerModal({
   onSelectReaction: (note: TimelineNote, reaction: string) => void;
 }) {
   const insets = useSafeAreaInsets();
+  const [customReaction, setCustomReaction] = React.useState("");
+  const reactionChoices = React.useMemo(() => {
+    const unique = new Map<string, string>();
+    [...note?.reactions.map((reaction) => reaction.emoji) || [], ...DEFAULT_REACTIONS].forEach((reaction) => {
+      const normalized = normalizeMisskeyReactionInput(reaction);
+      if (normalized && !unique.has(normalized)) {
+        unique.set(normalized, reaction);
+      }
+    });
+    return Array.from(unique.values());
+  }, [note]);
+
   React.useEffect(() => {
     if (Platform.OS === 'android' && visible) {
       const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -36,6 +53,10 @@ export function ReactionPickerModal({
       return () => sub.remove();
     }
   }, [visible, onClose]);
+
+  React.useEffect(() => {
+    if (!visible) setCustomReaction("");
+  }, [visible]);
 
   if (!note) return null;
 
@@ -56,7 +77,7 @@ export function ReactionPickerModal({
           <Text style={[styles.title, { color: colors.text }]}>リアクション</Text>
           
           <View style={styles.grid}>
-            {DEFAULT_REACTIONS.map((emoji) => (
+            {reactionChoices.map((emoji) => (
               <Pressable
                 key={emoji}
                 style={({ pressed }) => [
@@ -72,6 +93,33 @@ export function ReactionPickerModal({
                 <Text style={styles.emojiText}>{emoji}</Text>
               </Pressable>
             ))}
+          </View>
+
+          <View style={[styles.customReactionContainer, { borderColor: colors.border, backgroundColor: colors.bg }]}>
+            <TextInput
+              value={customReaction}
+              onChangeText={setCustomReaction}
+              placeholder="カスタム絵文字 (:emoji:)"
+              placeholderTextColor={colors.textMuted}
+              style={[styles.customReactionInput, { color: colors.text }]}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <Pressable
+              style={({ pressed }) => [
+                styles.customReactionButton,
+                { backgroundColor: colors.primary },
+                pressed && { opacity: 0.8 },
+              ]}
+              onPress={() => {
+                const normalized = normalizeMisskeyReactionInput(customReaction);
+                if (!normalized) return;
+                onClose();
+                onSelectReaction(note, normalized);
+              }}
+            >
+              <Text style={styles.customReactionButtonText}>追加</Text>
+            </Pressable>
           </View>
           
           <Pressable
@@ -145,6 +193,29 @@ const styles = StyleSheet.create({
   },
   emojiText: {
     fontSize: 28,
+  },
+  customReactionContainer: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 16,
+  },
+  customReactionInput: {
+    flex: 1,
+    fontSize: 15,
+  },
+  customReactionButton: {
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  customReactionButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 13,
   },
   cancelButton: {
     alignItems: "center",

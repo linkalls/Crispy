@@ -10,6 +10,7 @@ import { useMisskey, useMisskeyStream } from '../../src/hooks';
 import { Timeline, TabBar, FAB } from '../../src/components';
 import { TimelineTab, TimelineNote } from '../../src/utils/types';
 import { mapNote } from '../../src/utils/formatting';
+import { normalizeMisskeyReactionInput } from '../../src/utils/misskeyApi';
 import { styles } from '../../src/styles/styles';
 import { StatusBar } from 'expo-status-bar';
 
@@ -88,7 +89,9 @@ export default function HomeScreen() {
         await misskeyRequest('/api/notes/reactions/delete', { noteId: note.targetId }, true);
         showToast('成功', 'リアクションを解除しました。');
       } else {
-        await misskeyRequest('/api/notes/reactions/create', { noteId: note.targetId, reaction: target.emoji }, true);
+        const normalizedReaction = normalizeMisskeyReactionInput(target.emoji);
+        if (!normalizedReaction) return;
+        await misskeyRequest('/api/notes/reactions/create', { noteId: note.targetId, reaction: normalizedReaction }, true);
         showToast('成功', 'リアクションしました。');
       }
       loadTimeline(true);
