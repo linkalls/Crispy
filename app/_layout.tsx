@@ -14,6 +14,16 @@ import {
 import { TimelineNote } from '../src/utils/types';
 import { normalizeMisskeyReactionInput } from '../src/utils/misskeyApi';
 import { globalEvents } from '../src/context/InteractionState';
+import { logError } from '../src/utils/logger';
+
+// Catch global uncaught errors if possible
+if (typeof ErrorUtils !== 'undefined') {
+  ErrorUtils.setGlobalHandler((error: any, isFatal?: boolean) => {
+    logError(`Global Error (Fatal: ${isFatal})`, error, true).finally(() => {
+      // Pass to original handler if it exists
+    });
+  });
+}
 
 function RootModals() {
   const {
