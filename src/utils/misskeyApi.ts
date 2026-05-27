@@ -47,6 +47,23 @@ function getMisskeyEmojiCandidates(name: string): string[] {
   return Array.from(candidates);
 }
 
+export function buildMisskeyUserLookup(identifier: string): { userId?: string; username?: string; host?: string } {
+  const trimmed = identifier.trim();
+  if (!trimmed) return {};
+
+  const normalized = trimmed.replace(/^@+/, "");
+  const parts = normalized.split("@").filter(Boolean);
+
+  if (parts.length >= 2) {
+    return {
+      username: parts[0],
+      host: parts.slice(1).join("@"),
+    };
+  }
+
+  return { userId: trimmed };
+}
+
 export function addMisskeyEmojiToMap(
   emojiMap: Record<string, string>,
   name: string,

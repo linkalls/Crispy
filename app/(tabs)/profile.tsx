@@ -12,7 +12,7 @@ import { Note } from '../../src/components/Note';
 import { TimelineNote } from '../../src/utils/types';
 import { mapNote } from '../../src/utils/formatting';
 import { MfmRenderer } from '../../src/components/MfmRenderer';
-import { buildMisskeyEmojiMap, normalizeMisskeyReactionInput } from '../../src/utils/misskeyApi';
+import { buildMisskeyEmojiMap, buildMisskeyUserLookup, normalizeMisskeyReactionInput } from '../../src/utils/misskeyApi';
 
 type UserProfile = {
   id: string;
@@ -32,7 +32,7 @@ type UserProfile = {
 export default function ProfileScreen({ viewingUserId }: { viewingUserId?: string }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { activeAccount, colors, openImageViewer } = useGlobalState();
+  const { activeAccount, colors, openImageViewer, serverEmojiMap } = useGlobalState();
   const { openReactionPicker, openRenoteOptions, showToast } = useInteractionState();
   const { misskeyRequest } = useMisskey(activeAccount);
 
@@ -84,12 +84,16 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
           },
         ]);
       } else {
-        const targetUserId = viewingUserId || activeAccount.userId;
-        const [userInfo, userNotes, followingRes, followersRes] = await Promise.all([
-          misskeyRequest<UserProfile>('/api/users/show', { userId: targetUserId }, true),
-          misskeyRequest<any[]>('/api/users/notes', { userId: targetUserId, limit: 20 }, true),
-          misskeyRequest<any[]>('/api/users/following', { userId: targetUserId, limit: 30 }, true),
-          misskeyRequest<any[]>('/api/users/followers', { userId: targetUserId, limit: 30 }, true),
+        const targetUserIdentifier = viewingUserId || activeAccount.userId;
+        const userInfo = await misskeyRequest<UserProfile>(
+          '/api/users/show',
+          buildMisskeyUserLookup(targetUserIdentifier),
+          true,
+        );
+        const [userNotes, followingRes, followersRes] = await Promise.all([
+          misskeyRequest<any[]>('/api/users/notes', { userId: userInfo.id, limit: 20 }, true),
+          misskeyRequest<any[]>('/api/users/following', { userId: userInfo.id, limit: 30 }, true),
+          misskeyRequest<any[]>('/api/users/followers', { userId: userInfo.id, limit: 30 }, true),
         ]);
         setProfile(userInfo);
         setNotes(userNotes.map((n) => mapNote(n, activeAccount.host)));
@@ -102,7 +106,7 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeAccount, misskeyRequest]);
+  }, [activeAccount, misskeyRequest, viewingUserId]);
 
   useEffect(() => {
     loadProfile();
@@ -114,7 +118,7 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
 
   const handleUserPress = (userId: string) => {
     if (userId === activeAccount?.userId) return; // already here
-    router.push(`/user/${userId}`);
+    router.push(`/user/${encodeURIComponent(userId)}`);
   };
 
   const handleShare = async (note: TimelineNote) => {
@@ -165,7 +169,7 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
       <View style={[localStyles.infoWrap, { paddingTop: 48 }]}>
         <MfmRenderer
           nodes={mfm.parse(profileName)}
-          emojis={profileEmojiMap}
+          emojis={{ ...serverEmojiMap, ...profileEmojiMap }}
           colors={colors}
           textStyle={[localStyles.displayName, { color: colors.text }]}
           emojiSize={22}
@@ -176,7 +180,7 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
         {profile?.description && (
           <MfmRenderer
             nodes={mfm.parse(profile.description)}
-            emojis={profileEmojiMap}
+            emojis={{ ...serverEmojiMap, ...profileEmojiMap }}
             colors={colors}
             textStyle={[localStyles.bio, { color: colors.text }]}
           />
@@ -235,7 +239,13 @@ export default function ProfileScreen({ viewingUserId }: { viewingUserId?: strin
     <Pressable style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border }} onPress={() => handleUserPress(item.id)}>
       <Image source={{ uri: item.avatarUrl || 'https://api.dicebear.com/9.x/avataaars/svg?seed=default' }} style={{ width: 48, height: 48, borderRadius: 24 }} />
       <View style={{ flex: 1 }}>
-        <Text style={{ color: colors.text, fontSize: 16, fontWeight: 'bold' }} numberOfLines={1}>{item.name || item.username}</Text>
+        <MfmRenderer
+          nodes={mfm.parse(item.name || item.username)}
+          emojis={{ ...serverEmojiMap, ...buildMisskeyEmojiMap(item.emojis) }}
+          colors={colors}
+          textStyle={{ color: colors.text, fontSize: 16, fontWeight: 'bold' }}
+          emojiSize={18}
+        />
         <Text style={{ color: colors.textMuted, fontSize: 14 }} numberOfLines={1}>@{item.username}{item.host ? `@${item.host}` : ''}</Text>
         {item.description && <Text style={{ color: colors.text, fontSize: 14, marginTop: 4 }} numberOfLines={2}>{item.description}</Text>}
       </View>

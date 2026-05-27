@@ -49,7 +49,7 @@ export default function ExploreScreen() {
   };
 
   const handleUserPress = (userId: string) => {
-    router.push(`/user/${userId}`);
+    router.push(`/user/${encodeURIComponent(userId)}`);
   };
 
   const handleShare = async (note: TimelineNote) => {

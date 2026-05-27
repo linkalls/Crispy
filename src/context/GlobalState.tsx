@@ -18,6 +18,8 @@ interface GlobalStateContextType {
   isImageViewerVisible: boolean;
   previewMedia: { url: string; thumbnailUrl?: string; type?: string }[];
   previewImageIndex: number;
+  serverEmojis: Array<{ name: string; url: string }>;
+  serverEmojiMap: Record<string, string>;
 
   // Actions
   setAccounts: React.Dispatch<React.SetStateAction<StoredAccount[]>>;
@@ -26,6 +28,7 @@ interface GlobalStateContextType {
   setActiveAccountId: React.Dispatch<React.SetStateAction<string | null>>;
   setDevMode: React.Dispatch<React.SetStateAction<boolean>>;
   setThemeMode: React.Dispatch<React.SetStateAction<'system' | 'light' | 'dark'>>;
+  setServerEmojis: React.Dispatch<React.SetStateAction<Array<{ name: string; url: string }>>>;
   logoutCurrent: () => void;
   removeAccount: (id: string) => void;
 }
@@ -42,6 +45,7 @@ export function GlobalStateProvider({ children }: { children: React.ReactNode })
   const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
   const [previewMedia, setPreviewMedia] = useState<{ url: string; thumbnailUrl?: string; type?: string }[]>([]);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
+  const [serverEmojis, setServerEmojis] = useState<Array<{ name: string; url: string }>>([]);
 
   const systemColorScheme = useColorScheme();
 
@@ -89,6 +93,14 @@ export function GlobalStateProvider({ children }: { children: React.ReactNode })
   }, [themeMode, systemColorScheme]);
 
   const colors = isDark ? darkColors : lightColors;
+  const serverEmojiMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    serverEmojis.forEach((emoji) => {
+      map[emoji.name] = emoji.url;
+      map[`:${emoji.name}:`] = emoji.url;
+    });
+    return map;
+  }, [serverEmojis]);
 
   const logoutCurrent = useCallback(() => {
     if (!activeAccountId) return;
@@ -130,10 +142,13 @@ export function GlobalStateProvider({ children }: { children: React.ReactNode })
     isImageViewerVisible,
     previewMedia,
     previewImageIndex,
+    serverEmojis,
+    serverEmojiMap,
     setAccounts,
     setActiveAccountId,
     setDevMode,
     setThemeMode,
+    setServerEmojis,
     logoutCurrent,
     removeAccount,
     openImageViewer,

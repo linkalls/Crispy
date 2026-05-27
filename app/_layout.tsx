@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { GlobalStateProvider, useGlobalState } from '../src/context/GlobalState';
 import { useInteractionState } from '../src/context/InteractionState';
@@ -14,7 +15,16 @@ import { TimelineNote } from '../src/utils/types';
 import { normalizeMisskeyReactionInput } from '../src/utils/misskeyApi';
 
 function RootModals() {
-  const { isImageViewerVisible, previewMedia, previewImageIndex, closeImageViewer, activeAccount, colors } = useGlobalState();
+  const {
+    isImageViewerVisible,
+    previewMedia,
+    previewImageIndex,
+    closeImageViewer,
+    activeAccount,
+    colors,
+    serverEmojis,
+    setServerEmojis,
+  } = useGlobalState();
   const { misskeyRequest } = useMisskey(activeAccount);
   const {
     toast,
@@ -43,6 +53,33 @@ function RootModals() {
       showToast('失敗', error instanceof Error ? error.message : 'リポストに失敗しました。', true);
     }
   };
+
+  useEffect(() => {
+    if (!activeAccount || activeAccount.token === 'mock_token') {
+      setServerEmojis([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const response = await misskeyRequest<any>('/api/emojis', { limit: 2000 }, false);
+        const list = Array.isArray(response) ? response : Array.isArray(response?.emojis) ? response.emojis : [];
+        const nextEmojis = list
+          .filter((emoji: any) => typeof emoji?.name === 'string' && typeof emoji?.url === 'string')
+          .map((emoji: any) => ({ name: emoji.name, url: emoji.url }));
+
+        if (!cancelled) setServerEmojis(nextEmojis);
+      } catch (error) {
+        if (!cancelled) setServerEmojis([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeAccount, misskeyRequest, setServerEmojis]);
 
   const handleQuoteSubmit = async (text: string) => {
     if (!quotingNote) return;
@@ -122,6 +159,7 @@ function RootModals() {
       <ReactionPickerModal
         visible={isReactionPickerVisible}
         note={selectedNoteForReaction}
+        serverEmojis={serverEmojis}
         colors={colors}
         onClose={closeReactionPicker}
         onSelectReaction={(note, reaction) => {

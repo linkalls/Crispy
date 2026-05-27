@@ -9,9 +9,11 @@ import {
   Platform,
   BackHandler,
   TextInput,
+  Image,
+  ScrollView,
 } from "react-native";
 import { ColorScheme, TimelineNote } from "../utils/types";
-import { normalizeMisskeyReactionInput } from "../utils/misskeyApi";
+import { normalizeMisskeyReactionInput, resolveMisskeyEmojiUrl } from "../utils/misskeyApi";
 
 const DEFAULT_REACTIONS = [
   "👍", "❤️", "🔥", "😂", "🎉", "😮", "😢", "🙏",
@@ -21,28 +23,39 @@ const DEFAULT_REACTIONS = [
 export function ReactionPickerModal({
   visible,
   note,
+  serverEmojis = [],
   colors,
   onClose,
   onSelectReaction,
 }: {
   visible: boolean;
   note: TimelineNote | null;
+  serverEmojis?: Array<{ name: string; url: string }>;
   colors: ColorScheme;
   onClose: () => void;
   onSelectReaction: (note: TimelineNote, reaction: string) => void;
 }) {
   const insets = useSafeAreaInsets();
-  const [customReaction, setCustomReaction] = React.useState("");
+  const [query, setQuery] = React.useState("");
   const reactionChoices = React.useMemo(() => {
-    const unique = new Map<string, string>();
+    const unique = new Map<string, { reaction: string; url?: string }>();
     [...note?.reactions.map((reaction) => reaction.emoji) || [], ...DEFAULT_REACTIONS].forEach((reaction) => {
       const normalized = normalizeMisskeyReactionInput(reaction);
       if (normalized && !unique.has(normalized)) {
-        unique.set(normalized, reaction);
+        unique.set(normalized, {
+          reaction,
+          url: note ? resolveMisskeyEmojiUrl(note.emojis, reaction) : undefined,
+        });
       }
     });
     return Array.from(unique.values());
   }, [note]);
+  const customEmojiChoices = React.useMemo(() => {
+    const trimmed = query.trim().toLowerCase();
+    return serverEmojis
+      .filter((emoji) => !trimmed || emoji.name.toLowerCase().includes(trimmed))
+      .slice(0, trimmed ? 240 : 120);
+  }, [query, serverEmojis]);
 
   React.useEffect(() => {
     if (Platform.OS === 'android' && visible) {
@@ -55,7 +68,7 @@ export function ReactionPickerModal({
   }, [visible, onClose]);
 
   React.useEffect(() => {
-    if (!visible) setCustomReaction("");
+    if (!visible) setQuery("");
   }, [visible]);
 
   if (!note) return null;
@@ -77,9 +90,9 @@ export function ReactionPickerModal({
           <Text style={[styles.title, { color: colors.text }]}>リアクション</Text>
           
           <View style={styles.grid}>
-            {reactionChoices.map((emoji) => (
+            {reactionChoices.map((item) => (
               <Pressable
-                key={emoji}
+                key={item.reaction}
                 style={({ pressed }) => [
                   styles.emojiButton,
                   { backgroundColor: colors.reactionBg },
@@ -87,40 +100,54 @@ export function ReactionPickerModal({
                 ]}
                 onPress={() => {
                   onClose();
-                  onSelectReaction(note, emoji);
+                  onSelectReaction(note, item.reaction);
                 }}
               >
-                <Text style={styles.emojiText}>{emoji}</Text>
+                {item.url ? (
+                  <Image source={{ uri: item.url }} style={styles.emojiImage} resizeMode="contain" />
+                ) : (
+                  <Text style={styles.emojiText}>{item.reaction}</Text>
+                )}
               </Pressable>
             ))}
           </View>
 
           <View style={[styles.customReactionContainer, { borderColor: colors.border, backgroundColor: colors.bg }]}>
             <TextInput
-              value={customReaction}
-              onChangeText={setCustomReaction}
-              placeholder="カスタム絵文字 (:emoji:)"
+              value={query}
+              onChangeText={setQuery}
+              placeholder="カスタム絵文字を検索"
               placeholderTextColor={colors.textMuted}
               style={[styles.customReactionInput, { color: colors.text }]}
               autoCapitalize="none"
               autoCorrect={false}
             />
-            <Pressable
-              style={({ pressed }) => [
-                styles.customReactionButton,
-                { backgroundColor: colors.primary },
-                pressed && { opacity: 0.8 },
-              ]}
-              onPress={() => {
-                const normalized = normalizeMisskeyReactionInput(customReaction);
-                if (!normalized) return;
-                onClose();
-                onSelectReaction(note, normalized);
-              }}
-            >
-              <Text style={styles.customReactionButtonText}>追加</Text>
-            </Pressable>
           </View>
+
+          <ScrollView style={styles.customEmojiList} contentContainerStyle={styles.customEmojiListContent}>
+            {customEmojiChoices.map((emoji) => (
+              <Pressable
+                key={emoji.name}
+                style={({ pressed }) => [
+                  styles.customEmojiButton,
+                  { backgroundColor: colors.reactionBg, borderColor: colors.border },
+                  pressed && { opacity: 0.7 },
+                ]}
+                onPress={() => {
+                  onClose();
+                  onSelectReaction(note, `:${emoji.name}:`);
+                }}
+              >
+                <Image source={{ uri: emoji.url }} style={styles.customEmojiImage} resizeMode="contain" />
+                <Text style={[styles.customEmojiName, { color: colors.textMuted }]} numberOfLines={1}>
+                  :{emoji.name}:
+                </Text>
+              </Pressable>
+            ))}
+            {customEmojiChoices.length === 0 ? (
+              <Text style={[styles.emptyCustomEmoji, { color: colors.textMuted }]}>一致する絵文字がありません</Text>
+            ) : null}
+          </ScrollView>
           
           <Pressable
             style={({ pressed }) => [
@@ -194,6 +221,10 @@ const styles = StyleSheet.create({
   emojiText: {
     fontSize: 28,
   },
+  emojiImage: {
+    width: 30,
+    height: 30,
+  },
   customReactionContainer: {
     borderWidth: 1,
     borderRadius: 14,
@@ -201,21 +232,40 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 10,
   },
   customReactionInput: {
     flex: 1,
     fontSize: 15,
   },
-  customReactionButton: {
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+  customEmojiList: {
+    maxHeight: 240,
+    marginBottom: 16,
   },
-  customReactionButtonText: {
-    color: "#fff",
-    fontWeight: "700",
+  customEmojiListContent: {
+    gap: 8,
+  },
+  customEmojiButton: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  customEmojiImage: {
+    width: 24,
+    height: 24,
+  },
+  customEmojiName: {
     fontSize: 13,
+    flex: 1,
+  },
+  emptyCustomEmoji: {
+    fontSize: 13,
+    textAlign: "center",
+    paddingVertical: 8,
   },
   cancelButton: {
     alignItems: "center",

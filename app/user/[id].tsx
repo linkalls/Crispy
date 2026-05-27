@@ -7,12 +7,13 @@ import ProfileScreen from '../../app/(tabs)/profile';
 export default function UserProfileStackScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { activeAccount, colors } = useGlobalState();
+  const decodedId = typeof id === 'string' ? decodeURIComponent(id) : id;
 
   if (!activeAccount) return null;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ProfileScreen viewingUserId={id} />
+      <ProfileScreen viewingUserId={decodedId} />
     </View>
   );
 }

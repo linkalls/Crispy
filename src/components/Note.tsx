@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as mfm from 'mfm-js';
 import { Image, Pressable, Text, View, Linking } from 'react-native';
+import { useGlobalState } from '../context/GlobalState';
 import { styles } from '../styles/styles';
 import { ColorScheme, TimelineNote } from '../utils/types';
-import { resolveImagePreviewUrl } from '../utils/misskeyApi';
+import { resolveImagePreviewUrl, resolveMisskeyEmojiUrl } from '../utils/misskeyApi';
 import { MfmRenderer } from './MfmRenderer';
 import { ReplyComposer } from './ReplyComposer';
 
@@ -40,6 +41,9 @@ export function Note({
   onImagePress?: (media: { url: string; thumbnailUrl?: string; type?: string }[], index: number) => void;
   onReferencedNotePress?: (noteId: string) => void;
 }) {
+  const { serverEmojiMap } = useGlobalState();
+  const mergedEmojis = { ...serverEmojiMap, ...note.emojis };
+
   return (
     <Pressable
       style={[styles.noteCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
@@ -71,9 +75,13 @@ export function Note({
                 if (note.user.id) onUserPress?.(note.user.id);
               }}
             >
-              <Text style={[styles.noteName, { color: colors.text }]} numberOfLines={1}>
-                {note.user.name}
-              </Text>
+              <MfmRenderer
+                nodes={mfm.parse(note.user.name)}
+                emojis={mergedEmojis}
+                colors={colors}
+                textStyle={[styles.noteName, { color: colors.text }]}
+                emojiSize={18}
+              />
             </Pressable>
             <Text style={[styles.noteMeta, { color: colors.textMuted }]} numberOfLines={1}>
               @{note.user.username}@{note.user.host} · {note.createdAtLabel}
@@ -81,7 +89,7 @@ export function Note({
           </View>
 
           {/* コンテンツ */}
-          <MfmRenderer nodes={mfm.parse(note.content)} emojis={note.emojis} colors={colors} />
+          <MfmRenderer nodes={mfm.parse(note.content)} emojis={mergedEmojis} colors={colors} />
 
           {/* メディア表示 */}
           {note.files.length > 0 && (
@@ -136,14 +144,18 @@ export function Note({
             >
               <View style={styles.quoteHeaderRow}>
                 <Image source={{ uri: note.quote.user.avatar }} style={styles.quoteAvatar} />
-                <Text style={[styles.quoteName, { color: colors.text }]} numberOfLines={1}>
-                  {note.quote.user.name}
-                </Text>
+                <MfmRenderer
+                  nodes={mfm.parse(note.quote.user.name)}
+                  emojis={{ ...serverEmojiMap, ...note.quote.emojis }}
+                  colors={colors}
+                  textStyle={[styles.quoteName, { color: colors.text }]}
+                  emojiSize={16}
+                />
                 <Text style={[styles.quoteMeta, { color: colors.textMuted }]} numberOfLines={1}>
                   @{note.quote.user.username}@{note.quote.user.host} · {note.quote.createdAtLabel}
                 </Text>
               </View>
-              <MfmRenderer nodes={mfm.parse(note.quote.content)} emojis={note.quote.emojis} colors={colors} />
+              <MfmRenderer nodes={mfm.parse(note.quote.content)} emojis={{ ...serverEmojiMap, ...note.quote.emojis }} colors={colors} />
               
               {note.quote.files.length > 0 && (
                 <View style={styles.quoteMediaContainer}>
@@ -189,7 +201,7 @@ export function Note({
           {note.reactions && note.reactions.length > 0 ? (
             <View style={styles.reactionWrap}>
               {note.reactions.slice(0, 8).map((reaction, index) => {
-                const reactionEmojiUrl = reaction.url;
+                const reactionEmojiUrl = reaction.url || resolveMisskeyEmojiUrl(mergedEmojis, reaction.emoji);
                 return (
                   <Pressable
                     key={`${note.id}-${reaction.emoji}-${index}`}
