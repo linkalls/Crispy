@@ -67,6 +67,21 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Patch Metro Babel alias
+        shell: bash
+        run: |
+          set -euxo pipefail
+          if [ ! -d node_modules/@babel/traverse ]; then
+            echo "@babel/traverse is missing after bun install."
+            exit 1
+          fi
+
+          if [ ! -e node_modules/@babel/traverse--for-generate-function-map ]; then
+            ln -s traverse node_modules/@babel/traverse--for-generate-function-map
+          fi
+
+          node -e "require('@babel/traverse--for-generate-function-map'); console.log('Metro Babel alias is resolvable')"
+
       - name: Build Android project (release)
         run: |
           bunx expo prebuild --platform android --no-install
