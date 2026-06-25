@@ -21,63 +21,76 @@
   - `src/styles/styles.ts` - スタイル定義
   - `src/index.ts` - エクスポートファイル
 
+### ✅ 第3段階: アプリ機能の拡張
+
+- [x] ユーザープロフィール表示
+- [x] フォロー / フォロワー表示
+- [x] フォロー / ブロック操作
+- [x] ノート検索
+- [x] 通知一覧
+- [x] ノート詳細 / 返信一覧
+- [x] 投稿 / 画像添付 / 返信 / リノート / 引用リノート / リアクション
+- [x] 画像ビューア
+- [x] devモード / API Explorer / ログ表示
+
+### ✅ 第4段階: Bun運用への統一
+
+- [x] `packageManager` は `bun@1.1.0`
+- [x] `generate:misskey-presets` を `bun scripts/generate-misskey-explorer.mts` に変更
+- [x] `test` を `bun test tests/**/*.test.mts` に変更
+
 ## 次のステップ
 
-### 📋 第3段階: コンポーネント完全分割 (今後)
+### 🎨 UI/UX改善: X風の軽いタイムラインUI
 
-```
-src/components/
-├── AuthScreen.tsx         - ログイン画面
-├── Header.tsx            - ヘッダー
-├── TabBar.tsx            - タブバー
-├── AccountMenu.tsx       - アカウント切り替えメニュー
-├── Timeline.tsx          - タイムラインリスト
-├── Note.tsx              - ノート単体コンポーネント
-├── ReplyComposer.tsx     - 返信作成パネル
-└── MfmRenderer.tsx       - ✅ 完了
-```
+- [ ] ライトテーマを白背景 + 黒本文 + 薄い罫線 + 青アクセントに寄せる
+- [ ] ダークテーマを黒背景 + 薄いグレー本文 + 青アクセントに寄せる
+- [ ] ノートカードを角丸カード型から、境界線で区切るタイムラインセル型へ変更
+- [ ] 返信 / リノート / リアクション / 共有ボタンのタップ範囲を広げる
+- [ ] ノート内ボタンのタップで詳細画面へ誤遷移しないようにする
+- [ ] 投稿モーダルを全画面コンポーザー風にし、文字数・公開範囲・CW・画像添付を見やすくする
+- [ ] Home / Explore / Notifications / Profile のヘッダー密度を統一
+- [ ] Profile の自分自身に対するフォロー / ブロックボタンを非表示にする
+- [ ] 通知画面にタイトルヘッダーと空状態の説明を追加
 
-### 🎨 第4段階: UI/UX改善 (X風に近づけ)
+### 🔌 API機能拡張
 
-- ボトムシート風アカウント切り替え
-- より洗練されたメディア表示
-- アニメーション追加
-- ナビゲーション改善
-
-### 🔌 第5段階: API機能拡張
-
-- [ ] ユーザープロフィール表示
-- [ ] フォロー/フォロワー機能
-- [ ] 検索機能
-- [ ] DM(ダイレクトメッセージ)
 - [ ] ブックマーク機能
-- [ ] ライクシステム
-- [ ] ユーザーページ表示
+- [ ] ミュート / ブロック一覧
+- [ ] DM(ダイレクトメッセージ)
+- [ ] アンテナ / チャンネル対応
+- [ ] 下書き保存
 
 ## テスト方法
 
 ```bash
-# 開発サーバー起動
-npm run android  # Android Virtual Deviceで実行
+# 依存関係
+bun i
 
-# または
-npm run ios      # iOSシミュレーターで実行
+# 開発サーバー起動
+bun run android
+bun run ios
+bun run web
+
+# テスト
+bun test
 ```
 
 ## 現在の状態
 
-- ✅ 画像・メディア表示: 完全対応
+- ✅ 画像・メディア表示: 対応済み
 - ✅ 返信表示: プレビュー対応
 - ✅ 文字表示: 切れ防止対応
-- ✅ コード構造: 分割完了
-- ⚠️ UI/UX: 改善予定
-- ⏳ API機能: 拡張予定
+- ✅ コード構造: 分割済み
+- ✅ 主要Misskey操作: 投稿・返信・リノート・引用・リアクション対応
+- ✅ Bun運用: package script更新済み
+- ⚠️ UI/UX: ソース側の大きい差分適用は別PRで実施予定
 
 ## 注意事項
 
 1. **Android Studio エミュレータでのテスト**
-   - デバイスでのテスト時は `npm run android` を実行
-   - エラーが出た場合は `npm install` で依存関係を再インストール
+   - デバイスでのテスト時は `bun run android` を実行
+   - エラーが出た場合は `bun i` で依存関係を再インストール
 
 2. **画像キャッシング**
    - 初回読み込み時は少し時間がかかります
@@ -85,34 +98,24 @@ npm run ios      # iOSシミュレーターで実行
 
 3. **パフォーマンス**
    - 大量の画像読み込み時は、スクロールが重くなる可能性があります
-   - 将来的に仮想リスト対応予定
+   - `FlatList` の仮想化設定は入っているので、次は画像プリロードとメディア軽量化を検討
 
 ## ファイル構成
 
-```
+```text
 Crispy/
-├── App.tsx              # メインアプリコンポーネント (改善)
+├── app/                   # Expo Router screens
+│   ├── (tabs)/            # Home / Explore / Notifications / Profile
+│   ├── note/[id].tsx      # ノート詳細
+│   ├── user/[id].tsx      # ユーザー詳細
+│   ├── settings.tsx       # 設定
+│   └── api-explorer.tsx   # API Explorer
 ├── src/
-│   ├── components/      # Reactコンポーネント
-│   │   └── MfmRenderer.tsx
-│   ├── hooks/           # カスタムホック
-│   │   └── useMisskey.ts
-│   ├── utils/           # ユーティリティ
-│   │   ├── types.ts
-│   │   ├── colors.ts
-│   │   ├── formatting.ts
-│   │   └── index.ts
-│   └── styles/          # スタイル定義
-│       └── styles.ts
+│   ├── components/        # React Native components
+│   ├── context/           # GlobalState / InteractionState
+│   ├── hooks/             # useMisskey / stream hooks
+│   ├── styles/            # shared styles
+│   └── utils/             # types / formatting / API helpers
 ├── package.json
-├── tsconfig.json
 └── app.json
 ```
-
-## 次のアクション
-
-ユーザーが `あすべきことはないですか？` と聞いたら:
-
-1. **コンポーネント完全分割**: Note.tsx, Timeline.tsx等を作成
-2. **X風UI改善**: アカウントメニューの改善、ボトムシート対応
-3. **API拡張**: 新しいMisskey APIエンドポイント対応
