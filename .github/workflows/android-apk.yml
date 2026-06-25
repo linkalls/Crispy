@@ -15,8 +15,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CI: 1
+      NODE_ENV: production
       EXPO_NO_TELEMETRY: 1
       ANDROID_NDK_VERSION: 27.1.12297006
+      ANDROID_CMAKE_VERSION: 3.22.1
+      REACT_NATIVE_ARCHITECTURES: arm64-v8a
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,7 +43,11 @@ jobs:
         run: |
           set -euxo pipefail
           yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "cmake;${ANDROID_CMAKE_VERSION}"
 
           for attempt in 1 2 3; do
             if sdkmanager --install "ndk;${ANDROID_NDK_VERSION}"; then
@@ -64,7 +71,7 @@ jobs:
         run: |
           bunx expo prebuild --platform android --no-install
           cd android
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=${REACT_NATIVE_ARCHITECTURES}
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
