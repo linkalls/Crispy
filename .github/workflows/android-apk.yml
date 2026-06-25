@@ -13,15 +13,18 @@ permissions:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
+    env:
+      CI: 1
+      EXPO_NO_TELEMETRY: 1
+      ANDROID_NDK_VERSION: 27.1.12297006
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: 20
-          cache: npm
+          bun-version: 1.1.0
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -29,14 +32,39 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          set -euxo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+          for attempt in 1 2 3; do
+            if sdkmanager --install "ndk;${ANDROID_NDK_VERSION}"; then
+              break
+            fi
+
+            echo "NDK install failed on attempt ${attempt}; cleaning partial download before retry."
+            rm -rf "${ANDROID_HOME}/ndk/${ANDROID_NDK_VERSION}" "${ANDROID_HOME}/.temp"
+
+            if [ "${attempt}" = "3" ]; then
+              exit 1
+            fi
+
+            sleep 10
+          done
+
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Build Android project (release)
         run: |
-          npx expo prebuild --platform android --non-interactive --no-install
+          bunx expo prebuild --platform android --no-install
           cd android
-          ./gradlew assembleRelease
+          ./gradlew assembleRelease --no-daemon
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
