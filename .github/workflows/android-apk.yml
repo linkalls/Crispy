@@ -76,9 +76,8 @@ jobs:
             exit 1
           fi
 
-          if [ ! -e node_modules/@babel/traverse--for-generate-function-map ]; then
-            ln -s traverse node_modules/@babel/traverse--for-generate-function-map
-          fi
+          rm -rf node_modules/@babel/traverse--for-generate-function-map
+          cp -R node_modules/@babel/traverse node_modules/@babel/traverse--for-generate-function-map
 
           node -e "require('@babel/traverse--for-generate-function-map'); console.log('Metro Babel alias is resolvable')"
 
